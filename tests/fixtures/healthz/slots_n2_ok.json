@@ -1,0 +1,8 @@
+{"schema": "vb.healthz/1", "streams": [
+  {"stream_id": "cam-01", "state": "running", "fps": 1.0, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 41.0,
+   "queue_delay_ms_p95": 120, "dropped_frames": 0},
+  {"stream_id": "cam-02", "state": "running", "fps": 0.98, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 43.0,
+   "queue_delay_ms_p95": 180, "dropped_frames": 2}
+]}

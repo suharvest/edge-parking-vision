@@ -12,6 +12,12 @@
 | GET/PUT | `/config/counting` | counting 段；PUT 校验后写 override 并即时生效 |
 | GET | `/occupancy` | occupancy 快照（余位屏直连） |
 | POST | `/occupancy` | `{"occupancy": int}` → `manual_set` 快照 |
+| GET | `/slots/editor` | NRD-4 车位编辑页（`slots/editor.html`，原生 JS canvas） |
+| GET | `/snapshot/{stream}.jpg` | 基座快照 JPEG（编辑页背景，同一路 ≤ 1 次/秒） |
+| GET/PUT | `/config/slots` | 车位表；PUT 校验后原子写 `slots.override.json` 并即时重配 |
+
+slots 端点只在 app 提供 ``get_slots_config`` / ``set_slots``（如
+`slots.app.SlotsApp`）时可用，否则 404。
 """
 
 from __future__ import annotations
@@ -105,15 +111,24 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._get_config_counting()
             if u.path == "/occupancy":
                 return self._get_occupancy(q)
+            if u.path == "/slots/editor":
+                return self._get_slots_editor()
+            if u.path == "/config/slots":
+                return self._get_config_slots()
+            if u.path.startswith("/snapshot/") and u.path.endswith(".jpg"):
+                return self._get_snapshot_jpg(u.path)
         except Exception:  # noqa: BLE001
             log.exception("GET %s failed", u.path)
             return self._error(500, "internal error")
         self._error(404, f"no such path: {u.path}")
 
     def do_PUT(self):  # noqa: N802
-        if urlparse(self.path).path != "/config/counting":
-            return self._error(404, "no such path")
-        self._put_config_counting()
+        path = urlparse(self.path).path
+        if path == "/config/counting":
+            return self._put_config_counting()
+        if path == "/config/slots":
+            return self._put_config_slots()
+        self._error(404, "no such path")
 
     def do_POST(self):  # noqa: N802
         if urlparse(self.path).path != "/occupancy":
@@ -139,6 +154,9 @@ class _Handler(BaseHTTPRequestHandler):
         if picked is None:
             return self._error(404, "no stream")
         ctx, sid = picked
+        self._send_snapshot(ctx, sid)
+
+    def _send_snapshot(self, ctx, sid: str) -> None:
         now = time.monotonic()
         last = getattr(self.server, "_jpg_last", None) or {}
         if now - last.get(sid, 0.0) < _PREVIEW_MIN_INTERVAL_S:
@@ -147,6 +165,40 @@ class _Handler(BaseHTTPRequestHandler):
         last[sid] = now
         self.server._jpg_last = last
         self._send(200, bytes(jpeg), "image/jpeg")
+
+    # -------------------------------------------------------------- slots（NRD-4 P3）
+
+    def _get_slots_editor(self) -> None:
+        page = (_STATIC_DIR.parent / "slots" / "editor.html").read_bytes()
+        self._send(200, page, "text/html; charset=utf-8")
+
+    def _get_snapshot_jpg(self, path: str) -> None:
+        sid = path[len("/snapshot/"):-len(".jpg")]
+        if not sid or "/" in sid:
+            return self._error(404, f"no such path: {path}")
+        ctx = getattr(self.app, "_streams", {}).get(sid)
+        if ctx is None:
+            return self._error(404, f"no stream: {sid}")
+        self._send_snapshot(ctx, sid)
+
+    def _get_config_slots(self) -> None:
+        fn = getattr(self.app, "get_slots_config", None)
+        if fn is None:
+            return self._error(404, "slots not configured on this app")
+        self._json(fn())
+
+    def _put_config_slots(self) -> None:
+        fn = getattr(self.app, "set_slots", None)
+        if fn is None:
+            return self._error(404, "slots not configured on this app")
+        try:
+            body = self._read_json_body()
+            applied = fn(body)
+        except ValueError as exc:      # json 解析失败与校验失败 → 400（可读原因）
+            return self._error(400, f"invalid slots config: {exc}")
+        except Exception as exc:       # ConfigureError / TimeoutError 等
+            return self._error(503, f"apply failed: {type(exc).__name__}: {exc}")
+        self._json(applied)
 
     def _get_preview_json(self, q: dict) -> None:
         from vision_base.letterbox import box_to_source_norm

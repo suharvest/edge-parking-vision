@@ -1,0 +1,4 @@
+[2026-09-27T10:00:01Z] vb-runtime: stream cam-01 running
+[2026-09-27T10:00:12Z] RgaBlit(0) RGA_BLIT fail: Invalid argument
+[2026-09-27T10:00:12Z] RgaBlit(0) RGA_BLIT fail: Invalid argument
+[2026-09-27T10:00:13Z] vb-runtime: dropped frame on cam-03

@@ -39,9 +39,38 @@ from ..classes import CLASS_IDS
 
 log = logging.getLogger(__name__)
 
-__all__ = ["SlotHooks", "SlotsOptions", "slot_coverage_config"]
+__all__ = ["SlotHooks", "SlotsOptions", "slot_coverage_config", "is_convex"]
 
 _STATES = ("occupied", "free", "unknown")
+
+
+def is_convex(poly) -> bool:
+    """多边形凸性校验（§6.2：只在配置时调用一次，HTTP 层与基座 configure 双侧校验）。
+
+    ``poly`` 为 ``[[x, y], ...]``（归一化坐标）。≥3 个顶点、所有相邻边叉积
+    同号（允许共线边）才算凸；非凸或退化（全共线）返回 ``False``。
+    配置输入校验，不属于逐帧计算。
+    """
+    try:
+        pts = [(float(p[0]), float(p[1])) for p in poly]
+    except (TypeError, ValueError, IndexError):
+        return False
+    n = len(pts)
+    if n < 3:
+        return False
+    sign = 0
+    for i in range(n):
+        x1, y1 = pts[i]
+        x2, y2 = pts[(i + 1) % n]
+        x3, y3 = pts[(i + 2) % n]
+        cross = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2)
+        if abs(cross) < 1e-12:
+            continue                      # 共线边不影响凸性
+        s = 1 if cross > 0 else -1
+        if sign and s != sign:
+            return False
+        sign = s
+    return sign != 0
 
 
 @dataclass

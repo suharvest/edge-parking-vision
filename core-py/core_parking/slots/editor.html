@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<!--
+NRD-4 P3 车位编辑页（规格 §5.1/§5.3、§8.1 P3 行）。
+
+原生 JS + canvas，无框架无构建（§S1 标准库约定）：
+- 背景取 ``GET /snapshot/{stream}.jpg``（基座快照，最新一帧）；
+- 点击画面加顶点画多边形、拖动顶点调整、选中/删除/重命名车位；
+- 保存前客户端校验（≥3 顶点、id 唯一、凸多边形），``PUT /config/slots``
+  全量提交（服务端再校验一次并写 slots.override.json、即时生效）。
+坐标一律 0–1 源归一化，与 slots.schema.json / slot_coverage 配置一致。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>车位编辑 · edge-parking-slots</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 12px; background: #1b1e23; color: #ddd; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  #bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  button, select, input { background: #2a2f36; color: #ddd; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; }
+  button:disabled { opacity: .4; }
+  #msg { min-height: 1.2em; color: #8f8; white-space: pre-wrap; }
+  #msg.err { color: #f88; }
+  #wrap { position: relative; display: inline-block; border: 1px solid #444; }
+  canvas { display: block; max-width: 100%; cursor: crosshair; }
+  #list { margin-top: 8px; border-collapse: collapse; }
+  #list td, #list th { border: 1px solid #444; padding: 2px 8px; font-size: 13px; }
+  #list tr.sel { background: #345; }
+  .hint { color: #999; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>车位编辑（NRD-4 slots）</h1>
+<div id="bar">
+  <label>流 <select id="stream"></select></label>
+  <button id="reload">刷新快照</button>
+  <button id="add">新车位</button>
+  <button id="close" disabled>闭合多边形</button>
+  <button id="undo" disabled>撤销顶点</button>
+  <button id="del" disabled>删除选中</button>
+  <label>id <input id="slotid" size="10" placeholder="B1-023"></label>
+  <button id="rename" disabled>重命名选中</button>
+  <button id="save">保存（PUT /config/slots）</button>
+</div>
+<div class="hint">操作：点击画面加顶点；「闭合多边形」或点击首顶点附近结束；拖动顶点微调；点击多边形内部选中。坐标为 0–1 归一化。</div>
+<div id="msg"></div>
+<div id="wrap"><canvas id="cv" width="960" height="540"></canvas></div>
+<table id="list"><thead><tr><th>id</th><th>顶点数</th></tr></thead><tbody></tbody></table>
+
+<script>
+"use strict";
+const cv = document.getElementById("cv"), g = cv.getContext("2d");
+const $ = id => document.getElementById(id);
+const msg = (t, err) => { $("msg").textContent = t; $("msg").className = err ? "err" : ""; };
+
+let streamId = null;
+let slots = [];            // 当前流的 [{id, polygon:[[x,y]..]}]，归一化
+let allSlots = {};         // 全部流的映射（PUT 全量提交）
+let sel = -1;              // 选中车位下标
+let drawing = null;        // 正在画的 [[x,y],...]
+let img = null;            // 背景快照
+let drag = null;           // {slot, idx}
+
+// ---------------------------------------------------------------- 数据
+async function loadConfig() {
+  const r = await fetch("/config/slots");
+  if (!r.ok) throw new Error("GET /config/slots -> " + r.status + " " + (await r.text()));
+  allSlots = await r.json();
+  const selBox = $("stream");
+  selBox.innerHTML = "";
+  const ids = Object.keys(allSlots);
+  const q = new URLSearchParams(location.search).get("stream");
+  for (const id of ids) {
+    const o = document.createElement("option");
+    o.value = o.textContent = id;
+    selBox.appendChild(o);
+  }
+  if (!ids.length) { msg("当前没有运行中的流（GET /config/slots 为空）", true); return; }
+  streamId = q && ids.includes(q) ? q : ids[0];
+  selBox.value = streamId;
+  loadStream();
+}
+
+function loadStream() {
+  slots = JSON.parse(JSON.stringify(allSlots[streamId] || []));
+  sel = -1; drawing = null;
+  refreshSnapshot();
+  renderList();
+}
+
+async function refreshSnapshot() {
+  msg("加载快照 /snapshot/" + streamId + ".jpg …");
+  const im = new Image();
+  im.onload = () => { img = im; cv.width = im.naturalWidth; cv.height = im.naturalHeight; draw(); msg(""); };
+  im.onerror = () => { img = null; draw(); msg("快照加载失败（流可能未运行）", true); };
+  im.src = "/snapshot/" + encodeURIComponent(streamId) + ".jpg?t=" + Date.now();
+}
+
+// ---------------------------------------------------------------- 绘制
+function toPx(p) { return [p[0] * cv.width, p[1] * cv.height]; }
+function toNorm(x, y) {
+  const r = cv.getBoundingClientRect();
+  return [Math.min(1, Math.max(0, (x - r.left) * cv.width / r.width)),
+          Math.min(1, Math.max(0, (y - r.top) * cv.height / r.height))];
+}
+
+function drawPoly(poly, color, close) {
+  g.beginPath();
+  poly.forEach((p, i) => { const [x, y] = toPx(p); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+  if (close) g.closePath();
+  g.strokeStyle = color; g.lineWidth = 2; g.stroke();
+  if (close) { g.fillStyle = color + "33"; g.fill(); }
+  poly.forEach(p => { const [x, y] = toPx(p); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fillStyle = color; g.fill(); });
+}
+
+function draw() {
+  g.clearRect(0, 0, cv.width, cv.height);
+  if (img) g.drawImage(img, 0, 0, cv.width, cv.height);
+  else { g.fillStyle = "#111"; g.fillRect(0, 0, cv.width, cv.height); }
+  slots.forEach((s, i) => drawPoly(s.polygon, i === sel ? "#ff0" : "#0f6", true));
+  if (drawing) drawPoly(drawing, "#f80", false);
+  if (sel >= 0 && slots[sel]) {
+    const [x, y] = toPx(slots[sel].polygon[0]);
+    g.fillStyle = "#ff0"; g.font = "16px sans-serif"; g.fillText(slots[sel].id, x + 6, y - 6);
+  }
+}
+
+function renderList() {
+  const tb = document.querySelector("#list tbody");
+  tb.innerHTML = "";
+  slots.forEach((s, i) => {
+    const tr = document.createElement("tr");
+    if (i === sel) tr.className = "sel";
+    tr.innerHTML = "<td></td><td>" + s.polygon.length + "</td>";
+    tr.firstChild.textContent = s.id;
+    tr.onclick = () => { sel = i; renderList(); draw(); syncButtons(); };
+    tb.appendChild(tr);
+  });
+  syncButtons();
+}
+
+function syncButtons() {
+  $("close").disabled = !drawing || drawing.length < 3;
+  $("undo").disabled = !drawing || !drawing.length;
+  $("del").disabled = sel < 0;
+  $("rename").disabled = sel < 0 || !$("slotid").value.trim();
+}
+
+// ---------------------------------------------------------------- 交互
+cv.addEventListener("mousedown", ev => {
+  const p = toNorm(ev.clientX, ev.clientY);
+  if (drawing) {  // 画线模式：点首顶点附近 = 闭合
+    if (drawing.length >= 3) {
+      const [x0, y0] = toPx(drawing[0]);
+      const r = cv.getBoundingClientRect();
+      const dx = (ev.clientX - r.left) * cv.width / r.width - x0;
+      const dy = (ev.clientY - r.top) * cv.height / r.height - y0;
+      if (dx * dx + dy * dy < 144) return closePolygon();
+    }
+    drawing.push(p); draw(); syncButtons(); return;
+  }
+  // 命中顶点则拖动，否则尝试选中多边形
+  for (let i = slots.length - 1; i >= 0; i--) {
+    for (let j = 0; j < slots[i].polygon.length; j++) {
+      const [x, y] = toPx(slots[i].polygon[j]);
+      const r = cv.getBoundingClientRect();
+      const dx = (ev.clientX - r.left) * cv.width / r.width - x;
+      const dy = (ev.clientY - r.top) * cv.height / r.height - y;
+      if (dx * dx + dy * dy < 100) { sel = i; drag = { slot: i, idx: j }; renderList(); draw(); return; }
+    }
+  }
+  for (let i = slots.length - 1; i >= 0; i--) {
+    if (inPoly(p, slots[i].polygon)) { sel = i; renderList(); draw(); return; }
+  }
+  sel = -1; renderList(); draw();
+});
+cv.addEventListener("mousemove", ev => {
+  if (!drag) return;
+  slots[drag.slot].polygon[drag.idx] = toNorm(ev.clientX, ev.clientY);
+  draw();
+});
+addEventListener("mouseup", () => { drag = null; });
+cv.addEventListener("dblclick", () => { if (drawing && drawing.length >= 3) closePolygon(); });
+
+function inPoly(p, poly) {  // 射线法（编辑页交互用，与服务端凸性校验无关）
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > p[1]) !== (yj > p[1]) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+}
+
+function isConvex(poly) {  // 与 hooks_slots.is_convex 同口径：叉积不变号、非退化
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x1, y1] = poly[i], [x2, y2] = poly[(i + 1) % poly.length], [x3, y3] = poly[(i + 2) % poly.length];
+    const cr = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
+    if (Math.abs(cr) < 1e-12) continue;
+    const s = cr > 0 ? 1 : -1;
+    if (sign && s !== sign) return false;
+    sign = s;
+  }
+  return sign !== 0;
+}
+
+// ---------------------------------------------------------------- 按钮
+$("stream").onchange = () => { streamId = $("stream").value; loadStream(); };
+$("reload").onclick = refreshSnapshot;
+$("add").onclick = () => { drawing = []; sel = -1; renderList(); draw(); msg("画车位：点击画面加顶点，≥3 个后「闭合多边形」"); };
+$("undo").onclick = () => { drawing.pop(); draw(); syncButtons(); };
+$("del").onclick = () => { slots.splice(sel, 1); sel = -1; renderList(); draw(); };
+$("rename").onclick = () => {
+  slots[sel].id = $("slotid").value.trim();
+  renderList(); draw();
+};
+$("close").onclick = closePolygon;
+cv.addEventListener("contextmenu", e => e.preventDefault());
+$("slotid").oninput = syncButtons;
+
+function closePolygon() {
+  if (!drawing || drawing.length < 3) return;
+  if (!isConvex(drawing)) { msg("多边形非凸或退化，请调整顶点（撤销重画）", true); return; }
+  let id = $("slotid").value.trim();
+  if (!id) { msg("请先在 id 框输入车位名（如 B1-023）", true); return; }
+  if (slots.some(s => s.id === id)) { msg("id 重复: " + id, true); return; }
+  slots.push({ id, polygon: drawing.map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]) });
+  drawing = null; sel = slots.length - 1; $("slotid").value = "";
+  renderList(); draw(); msg("已加入 " + id + "（未保存）");
+}
+
+$("save").onclick = async () => {
+  if (drawing) { msg("有未闭合的多边形，先闭合或撤销", true); return; }
+  for (const s of slots) {
+    if (s.polygon.length < 3) return msg("车位 " + s.id + " 顶点不足 3 个", true);
+    if (!isConvex(s.polygon)) return msg("车位 " + s.id + " 多边形非凸", true);
+  }
+  const ids = slots.map(s => s.id);
+  if (new Set(ids).size !== ids.length) return msg("车位 id 重复", true);
+  allSlots[streamId] = slots;
+  try {
+    const r = await fetch("/config/slots", {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(allSlots),
+    });
+    const text = await r.text();
+    if (!r.ok) return msg("保存失败 " + r.status + ": " + text, true);
+    allSlots = JSON.parse(text);
+    msg("已保存并即时生效（" + r.status + "）");
+    renderList(); draw();
+  } catch (e) { msg("保存异常: " + e, true); }
+};
+
+loadConfig().catch(e => msg("初始化失败: " + e, true));
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{"schema": "vb.healthz/1", "streams": [
+  {"stream_id": "cam-01", "state": "running", "fps": 0.99, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 61.0,
+   "queue_delay_ms_p95": 420, "dropped_frames": 0},
+  {"stream_id": "cam-02", "state": "running", "fps": 0.97, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 63.0,
+   "queue_delay_ms_p95": 510, "dropped_frames": 1},
+  {"stream_id": "cam-03", "state": "running", "fps": 0.96, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 66.0,
+   "queue_delay_ms_p95": 1500, "dropped_frames": 3},
+  {"stream_id": "cam-04", "state": "running", "fps": 0.95, "decode": "mpp",
+   "fallback_active": false, "inference_ms_p95": 65.0,
+   "queue_delay_ms_p95": 610, "dropped_frames": 2}
+]}
