@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--split", default=None, help="src 为单目录时的输出 split 名（默认 'all'）")
     ap.add_argument("--strict", action="store_true",
                     help="只保留满足大陆单行牌正则的样本（过滤标注噪声）")
+    ap.add_argument("--tag", default="ccpd2020_green", help="输出文件名前缀（见 ccpd_to_coco.py --tag）")
     args = ap.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -82,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         splits = [(args.split or "all", args.src)]
     for split, d in splits:
-        out_file = args.out / f"ccpd2020_green_{split}.txt"
+        out_file = args.out / f"{args.tag}_{split}.txt"
         total += to_rec(d, split, args.strict, out_file)
     print(f"total labels: {total}")
     return 0

@@ -185,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", required=True, type=Path, help="输出目录")
     ap.add_argument("--splits", default="train,val,test", help="逗号分隔；src 为单目录时忽略")
     ap.add_argument("--split", default=None, help="src 为单目录时的输出 split 名（默认 'all'）")
+    ap.add_argument("--tag", default="ccpd2020_green",
+                    help="输出文件名前缀（CCPD2020 绿牌 ccpd2020_green，CCPD2019 蓝牌 ccpd2019_base 等）")
     args = ap.parse_args(argv)
 
     args.out.mkdir(parents=True, exist_ok=True)
@@ -197,13 +199,13 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             coco = to_coco(d, split)
             total += len(coco["images"])
-            (args.out / f"ccpd2020_green_{split}.json").write_text(
+            (args.out / f"{args.tag}_{split}.json").write_text(
                 json.dumps(coco, ensure_ascii=False), encoding="utf-8")
     else:
         split = args.split or "all"
         coco = to_coco(args.src, split)
         total = len(coco["images"])
-        (args.out / f"ccpd2020_green_{split}.json").write_text(
+        (args.out / f"{args.tag}_{split}.json").write_text(
             json.dumps(coco, ensure_ascii=False), encoding="utf-8")
     print(f"total images: {total}")
     return 0

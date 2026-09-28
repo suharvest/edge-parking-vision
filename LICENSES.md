@@ -9,6 +9,7 @@
 | 代码 | YOLOX 代码（导出用，0.3.0） | Apache-2.0 | https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE | 是 | 保留 NOTICE |
 | 权重 | `yolox_tiny.pth`（release 0.1.1rc0，sha256 `9de513de…aee8f0`，不入库） | 随 release 附 Apache-2.0 LICENSE 发布；授权声明独立于代码许可（BASE-1 §7.1） | 同上 | 按用户 2026-09-26 决策继续用于测试与基准；不分发 .pth；不据此写「权重可商用」 | NOTICE 记录 release tag 与 sha256 |
 | 训练数据 | COCO 2017 | 标注 CC BY 4.0；图片版权归各 Flickr 作者 | https://cocodataset.org/#termsofuse（原文见 URD-2 §7.3） | 不写「COCO 可商用」；不分发 COCO 图片 | 署名 COCO Consortium |
+| 训练数据 | CCPD（CCPD2019 蓝牌 + CCPD2020 绿牌，车牌检测/识别训练） | MIT | https://github.com/detectRecog/CCPD/blob/master/LICENSE（"MIT License, Copyright (c) 2017 CCPD"；README："This dataset is open-source under MIT license."，2026-09-25 核实，见 NRD-3 §7） | 是 | 图片含真实车牌，只用于训练，不进 gallery、不随交付分发；parity/校准帧不取 CCPD（用 dev 集） |
 
 用户 2026-09-26 决策：COCO 权重在 A 类（测试与基准用）继续使用；后续自训权重按 Apache-2.0 发布（NRD-3 车牌模型），自训不自动消除初始化权重与训练数据的许可，替换后仍逐文件列清单。
 
