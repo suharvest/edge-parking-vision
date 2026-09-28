@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "crossing-event.schema.json",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [
+    {"$ref": "envelope.schema.json"},
+    {
+      "type": "object",
+      "required": ["direction", "track_id", "vehicle_class", "confidence", "occupancy_after", "free_after"],
+      "properties": {
+        "schema":          {"const": "parking.crossing/1"},
+        "direction":       {"enum": ["in", "out"]},
+        "track_id":        {"type": "integer", "minimum": 0},
+        "vehicle_class":   {"enum": ["car", "motorcycle", "bus", "truck"]},
+        "confidence":      {"type": "number", "minimum": 0, "maximum": 1},
+        "occupancy_after": {"type": "integer", "minimum": 0},
+        "free_after":      {"type": "integer", "minimum": 0}
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "schema": "parking.occupancy/1",
+  "event_id": "7d2e9a40-1b3c-4f55-8c2a-9e0a1b2c3d4e",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a",
+  "ts": 1790000000456,
+  "seq": 1043,
+  "replayed": false,
+  "occupancy": 57,
+  "capacity": 120,
+  "free": 63,
+  "in_today": 311,
+  "out_today": 254,
+  "reason": "crossing"
+}

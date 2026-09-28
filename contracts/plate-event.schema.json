@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plate-event.schema.json",
+  "description": "NRD-3 §6.1 车牌识别事件（…/plate）。本期仅中国大陆制式（NRD-3 §0.1）：region=cn，plate_type 无 de。",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [
+    {"$ref": "envelope.schema.json"},
+    {
+      "type": "object",
+      "required": ["plate", "plate_normalized", "region", "plate_type", "confidence",
+                   "votes", "frames", "bbox", "track_id", "snapshot"],
+      "properties": {
+        "schema":           {"const": "parking.plate/1"},
+        "plate":            {"type": "string", "minLength": 1, "description": "投票产生的原始识别字符串"},
+        "plate_normalized": {"type": "string", "minLength": 1, "description": "normalize() 后用于白名单精确匹配"},
+        "region":           {"enum": ["cn"], "description": "本期仅 cn；de 暂缓（NRD-3 §0.1）"},
+        "plate_type":       {"enum": ["cn_blue", "cn_green"], "description": "蓝牌 7 位 / 新能源绿牌 8 位；de 暂缓"},
+        "confidence":       {"type": "number", "minimum": 0, "maximum": 1, "description": "最终字符串逐字符置信度最小值（text_read.min_char_conf）"},
+        "votes":            {"type": "integer", "minimum": 1},
+        "frames":           {"type": "integer", "minimum": 1},
+        "bbox":             {"$ref": "#/$defs/bbox"},
+        "track_id":         {"type": "integer", "minimum": 0},
+        "snapshot": {
+          "oneOf": [
+            {"type": "null", "description": "快照请求超时时为 null 并计数"},
+            {"$ref": "#/$defs/image_ref"}
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "bbox": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0, "maximum": 1},
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "源归一化 xyxy（text_read.bbox）"
+    },
+    "image_ref": {
+      "type": "object",
+      "required": ["url", "sha256", "width", "height"],
+      "properties": {
+        "url":    {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "width":  {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  }
+}

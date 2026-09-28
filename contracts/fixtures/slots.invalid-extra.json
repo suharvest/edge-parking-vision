@@ -1,0 +1,31 @@
+{
+  "schema": "parking.slots/1",
+  "event_id": "0f1e2d3c-4b5a-4378-9a0b-1c2d3e4f5a6b",
+  "site_id": "demo-lot",
+  "camera_id": "cam-b1-01",
+  "ts": 1790000001000,
+  "seq": 530,
+  "replayed": false,
+  "changed": [
+    "B1-023"
+  ],
+  "slots": [
+    {
+      "id": "B1-023",
+      "state": "occupied",
+      "since": 1789999990000,
+      "cover": 0.71
+    },
+    {
+      "id": "B1-024",
+      "state": "free",
+      "since": 1789990000000,
+      "cover": 0.0
+    }
+  ],
+  "occupied": 1,
+  "free": 1,
+  "unknown": 0,
+  "stream_ok": true,
+  "camera": "cam-b1-01"
+}

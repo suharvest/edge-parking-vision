@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "envelope.schema.json",
+  "type": "object",
+  "required": ["schema", "event_id", "site_id", "camera_id", "ts", "seq", "replayed"],
+  "properties": {
+    "schema":    {"type": "string", "pattern": "^parking\\.[a-z_]+/1$"},
+    "event_id":  {"type": "string", "format": "uuid"},
+    "site_id":   {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+    "camera_id": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+    "ts":        {"type": "integer", "description": "事件发生时刻，epoch ms（VBE1 的 wall_ms 取整）"},
+    "seq":       {"type": "integer", "minimum": 0, "description": "每 camera 单调递增，持久化，重启不回退"},
+    "replayed":  {"type": "boolean", "description": "true = 断网期间产生、恢复后从 spool 补发"}
+  }
+}

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "plate-crop.schema.json",
+  "description": "NRD-3 §6.1b 降级模式裁切记录（…/plate_crop，仅 SG2002 detect_only）。track_closed=false 为裁切记录，true 为轨迹结束记录。",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [
+    {"$ref": "envelope.schema.json"},
+    {
+      "type": "object",
+      "required": ["schema", "track_id"],
+      "properties": {
+        "schema":    {"const": "parking.plate_crop/1"},
+        "track_id":  {"type": "integer", "minimum": 0}
+      }
+    },
+    {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["track_closed", "crop_index", "max_picks", "det_score", "bbox", "crop"],
+          "properties": {
+            "track_closed": {"const": false},
+            "crop_index":   {"type": "integer", "minimum": 0},
+            "max_picks":    {"type": "integer", "minimum": 1},
+            "det_score":    {"type": "number", "minimum": 0, "maximum": 1},
+            "bbox":         {"$ref": "#/$defs/bbox"},
+            "crop":         {"$ref": "#/$defs/image_ref"}
+          }
+        },
+        {
+          "type": "object",
+          "required": ["track_closed", "crops_sent", "snapshot"],
+          "properties": {
+            "track_closed": {"const": true},
+            "crops_sent":   {"type": "integer", "minimum": 0},
+            "snapshot":     {"$ref": "#/$defs/image_ref"}
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "bbox": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0, "maximum": 1},
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "源归一化 xyxy"
+    },
+    "image_ref": {
+      "type": "object",
+      "required": ["url", "sha256", "width", "height"],
+      "properties": {
+        "url":    {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "width":  {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  }
+}

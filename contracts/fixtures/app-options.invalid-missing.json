@@ -1,0 +1,15 @@
+{
+  "mqtt": {"host": "r1124.local", "port": 1883, "username": "demo-lot-gate-a", "password": "", "keepalive_s": 30},
+  "http": {"port": 8080},
+  "classes": [2, 3, 5, 7],
+  "spool": {"max_events": 50000},
+  "preview_frame_stride": 15,
+  "counting": {
+    "line": {"a": [0.10, 0.60], "b": [0.90, 0.60]},
+    "in_side": "positive",
+    "count_directions": ["in", "out"],
+    "band": 0.03, "segment_margin": 0.05, "min_track_frames": 3, "min_travel": 0.06,
+    "reborn_window_s": 2.0, "reborn_dist": 0.08,
+    "capacity": 120, "initial_occupancy": 0, "publish_interval_ms": 1000
+  }
+}

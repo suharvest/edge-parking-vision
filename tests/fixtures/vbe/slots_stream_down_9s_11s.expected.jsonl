@@ -1,0 +1,2 @@
+{"kind": "slots", "ts": 1790000001000, "body": {"changed": ["B1-030"], "slots": [{"id": "B1-030", "state": "occupied", "since": 1790000001000, "cover": 0.66}], "occupied": 1, "free": 0, "unknown": 0, "stream_ok": true}}
+{"kind": "slots", "ts": 1790000013000, "body": {"changed": [], "slots": [{"id": "B1-030", "state": "unknown", "since": 1790000013000, "cover": 0.66}], "occupied": 0, "free": 0, "unknown": 1, "stream_ok": false}}

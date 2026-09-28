@@ -1,0 +1,61 @@
+# NRD-2 P7 演示看板（可选）——规格 §8.3 P7、§S12
+# 演示用，不作产品能力。broker 不在此文件内：正式部署时 broker 在 R1124 上（§S12），
+# telegraf 以 viewer 角色连它（只读 +/parking/#）。本地验收时可用 docker run
+# 单独起一个 eclipse-mosquitto:2 作为替身 broker。
+services:
+  influxdb:
+    image: influxdb:2.7
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: ${DOCKER_INFLUXDB_INIT_MODE:-setup}
+      DOCKER_INFLUXDB_INIT_USERNAME: ${DOCKER_INFLUXDB_INIT_USERNAME:-demo}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${DOCKER_INFLUXDB_INIT_PASSWORD:-demodemo}
+      DOCKER_INFLUXDB_INIT_ORG: ${DOCKER_INFLUXDB_INIT_ORG:-edge-parking}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-parking}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUX_TOKEN:-demo-token-not-for-production}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  telegraf:
+    image: telegraf:1.33
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      # R1124 broker 地址（正式部署：R1124 上 systemd 的 mosquitto，见 §S12）
+      MQTT_HOST: ${MQTT_HOST:-r1124.local}
+      MQTT_PORT: ${MQTT_PORT:-1883}
+      MQTT_USERNAME: ${MQTT_USERNAME:-viewer}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-viewer}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-demo-token-not-for-production}
+      INFLUX_ORG: ${DOCKER_INFLUXDB_INIT_ORG:-edge-parking}
+      INFLUX_BUCKET: ${DOCKER_INFLUXDB_INIT_BUCKET:-parking}
+    volumes:
+      - ./telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+
+  grafana:
+    image: ${GRAFANA_IMAGE:-grafana/grafana:11.6.0}
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-demo}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-demodemo}
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUX_TOKEN:-demo-token-not-for-production}
+      INFLUX_ORG: ${DOCKER_INFLUXDB_INIT_ORG:-edge-parking}
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  influxdb-data:
+  grafana-data:

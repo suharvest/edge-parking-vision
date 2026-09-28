@@ -1,0 +1,29 @@
+edge-parking-vision
+===================
+
+Copyright 2026 Seeed Studio
+
+本仓库按 Apache License 2.0 发布（见 LICENSE）。本文件按规格 §S1 只列出
+「停车仓库自己拷入的文件」与「基座镜像 ref + digest」；不罗列基座镜像的
+全部依赖（其第三方组件见 retail-vision 的 NOTICE）。
+
+C0 阶段以下为占位（文件尚未拷入 / 镜像尚未发布，来源与许可已在对应行注明）：
+
+计划拷入的文件（来源均带各自许可，拷入时保持原样）：
+- third_party/vb/vb_analyzer_abi.h
+  来源：retail-vision（github.com/Seeed-Solution/retail-vision），
+  tag vision-base-v<semver>（发布后填写），Apache License 2.0。
+- platforms/host-mounts/{jetson,rk3576,rk3588,hailo}.yaml
+  来源：retail-vision 同一 tag 的 platforms/host-mounts/，Apache License 2.0。
+- platforms/jetson/build_engine.sh
+  来源：fall-detection origin/main@5af128d，Apache License 2.0。
+- third_party/nlohmann/json.hpp + LICENSE.MIT
+  来源：nlohmann/json v3.11.3，MIT License。
+
+基座镜像 ref + digest：
+- vision-base-{cpu,jetson,rk,hailo}：尚未发布，digest 待
+  platforms/base-images.lock.yaml（子任务 X0）锁定后在此补录。
+
+edge-security-kit（无 LICENSE）不拷入任何文件、只借设计，故不出现在本文件。
+edge-inspection-assembly 的 RKNN/Hailo 转换脚本只照写法重写、不整文件拷贝
+（其 LICENSE 未核实前不进 NOTICE）。

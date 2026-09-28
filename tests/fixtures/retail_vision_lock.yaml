@@ -1,0 +1,15 @@
+# retail-vision 锁文件快照（规格 §S11.2 tests/test_base_images.py 用）。
+#
+# 正常流程：由 `bash tools/check_base_images.sh --sync` 从 retail-vision@<retail_vision_tag>
+# 的 platforms/base-images.lock.yaml 原样拷入生成。
+#
+# 当前状态（X0 执行时手工建立）：retail-vision 尚未打 vision-base-v* tag，
+# 仓库内也无 platforms/base-images.lock.yaml —— 上游缺失，已按 §S13 汇报。
+# 本文件为占位快照，digest 保持「需核实」；tests/test_base_images.py 对
+# digest 的断言按 §8.0 X0 行设计失败。上游就绪后重跑 --sync 覆盖本文件，禁止手编 digest。
+source: "需核实"   # 应为 <retail_vision_repo>@<retail_vision_tag>:platforms/base-images.lock.yaml
+bases:
+  cpu:    {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-cpu:需核实,    digest: "需核实"}
+  jetson: {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-jetson:需核实, digest: "需核实"}
+  rk:     {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-rk:需核实,     digest: "需核实"}
+  hailo:  {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-hailo:需核实,  digest: "需核实"}

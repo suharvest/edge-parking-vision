@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gate-config.schema.json",
+  "description": "NRD-3 §5.4 R1124 gate 服务配置（/etc/edge-parking/gate.json）。",
+  "type": "object",
+  "required": ["site_id", "device_id", "mqtt", "http", "state_dir", "whitelist_path",
+               "do_line", "pulse_ms", "min_interval_s", "subscribe_cameras", "gate_id"],
+  "properties": {
+    "site_id":   {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+    "device_id": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+    "mqtt":      {"$ref": "#/$defs/mqtt"},
+    "http": {
+      "type": "object",
+      "required": ["port"],
+      "properties": {"port": {"type": "integer", "minimum": 1, "maximum": 65535}},
+      "additionalProperties": false
+    },
+    "state_dir":       {"type": "string", "minLength": 1},
+    "whitelist_path":  {"type": "string", "minLength": 1},
+    "do_line":         {"type": "string", "minLength": 1, "description": "R1124 DO 的 gpiod 线名（规格中标注需核实）"},
+    "pulse_ms":        {"type": "integer", "minimum": 1},
+    "min_interval_s":  {"type": "number", "minimum": 0},
+    "subscribe_cameras": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+      "description": "只对这些 camera_id 的 plate 事件做白名单匹配"
+    },
+    "gate_id": {"type": "string", "pattern": "^[a-z0-9-]{1,32}$", "description": "作为 gate 事件的 camera_id（如 gate-a-barrier）"}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "mqtt": {
+      "type": "object",
+      "required": ["host", "port", "username", "password", "keepalive_s"],
+      "properties": {
+        "host":        {"type": "string", "minLength": 1},
+        "port":        {"type": "integer", "minimum": 1, "maximum": 65535},
+        "username":    {"type": "string"},
+        "password":    {"type": "string"},
+        "keepalive_s": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,2 @@
+{"meta": {"stream_id": "gate-a", "counting": {"in_side": "positive", "capacity": 10, "initial_occupancy": 0}}}
+{"seq": 1, "wall_ms": 1790000002000.9, "type": "line_cross", "track_id": 3, "fields": {"line_id": "main", "direction": "backward", "anchor": [0.40, 0.6], "class_id": 3, "score": 0.66}}

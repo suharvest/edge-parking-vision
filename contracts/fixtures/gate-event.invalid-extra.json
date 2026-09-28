@@ -1,0 +1,17 @@
+{
+  "schema": "parking.gate/1",
+  "event_id": "1a2b3c4d-5e6f-4378-9a0b-0d1e2f3a4b5c",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a-barrier",
+  "ts": 1790000000912,
+  "seq": 18,
+  "replayed": false,
+  "action": "open_pulse",
+  "trigger": "whitelist",
+  "plate_event_id": "0f1e2d3c-4b5a-4378-9a0b-1c2d3e4f5a6b",
+  "plate_normalized": "粤B12345",
+  "whitelist_label": "员工-张",
+  "pulse_ms": 500,
+  "latency_ms": 123,
+  "do_line": "DO1"
+}

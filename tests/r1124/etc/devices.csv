@@ -1,0 +1,4 @@
+# username,role,password —— 测试固定口令，勿用于真机
+dev-a,device,dev-pass
+viewer-1,viewer,view-pass
+op-1,operator,op-pass

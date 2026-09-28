@@ -1,0 +1,44 @@
+# NRD-2/NRD-3/NRD-4 共用停车应用仓库（规格：seeed-solutions-hub docs/rd-specs/NRD-2-parking-vehicle-counting.md §S1）。
+# 运行依赖只有 retail-vision（提供 vision_base，标准库实现）。
+# TODO(vision-base tag)：基座未打 tag 前用路径依赖（BASE-1 §11 D4）；
+# tag 发布后改回 git 依赖：
+#   "retail-vision @ git+https://github.com/Seeed-Solution/retail-vision@vision-base-v<semver>"
+[project]
+name = "edge-parking-vision"
+version = "0.1.0"
+description = "Edge parking vision (NRD-2 counting / NRD-3 plate / NRD-4 slots) on the unified vision base"
+readme = { text = "See LICENSES.md and contracts/ for the MQTT event contracts.", content-type = "text/plain" }
+requires-python = ">=3.10"
+dependencies = [
+    "retail-vision",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "jsonschema>=4.21",
+    "pyyaml>=6.0",  # 只给 tools/ 读 models/registry.yaml，不进 core_parking
+    "onnx>=1.17",  # 仅 M0 模型导出/形状检查（§8.1 M0），不进 core_parking 运行时
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# package-dir 指向 core-py（§S1）
+[tool.hatch.build.targets.wheel]
+packages = ["core-py/core_parking"]
+
+[tool.hatch.build.targets.sdist]
+include = ["core-py", "contracts", "LICENSE", "NOTICE"]
+
+[tool.pytest.ini_options]
+pythonpath = ["core-py", "contracts", "."]
+testpaths = ["tests"]
+markers = [
+    "broker: needs a real MQTT broker (VB_TEST_BROKER=host:port)",
+]
+
+[tool.uv.sources]
+# 路径依赖：retail-vision 分支 feat/vision-base；tag 发布后改为 git 依赖（见上）
+retail-vision = { path = "../retail-vision", editable = true }

@@ -1,0 +1,33 @@
+{
+  "comment": "规格 §6.2 映射表：app.options.counting → 基座 line_cross 配置。in_side/count_directions/capacity/initial_occupancy/publish_interval_ms 不下发。",
+  "options_counting": {
+    "line": {"a": [0.10, 0.60], "b": [0.90, 0.60]},
+    "in_side": "positive",
+    "count_directions": ["in", "out"],
+    "band": 0.03,
+    "segment_margin": 0.05,
+    "min_track_frames": 3,
+    "min_travel": 0.06,
+    "reborn_window_s": 2.0,
+    "reborn_dist": 0.08,
+    "capacity": 120,
+    "initial_occupancy": 0,
+    "publish_interval_ms": 1000
+  },
+  "classes": [2, 3, 5, 7],
+  "expected_analyzers": [
+    {
+      "name": "line_cross",
+      "config": {
+        "lines": [{"id": "main", "a": [0.10, 0.60], "b": [0.90, 0.60]}],
+        "band": 0.03,
+        "segment_margin": 0.05,
+        "min_track_frames": 3,
+        "min_travel": 0.06,
+        "reborn_window_s": 2.0,
+        "reborn_dist": 0.08,
+        "classes": [2, 3, 5, 7]
+      }
+    }
+  ]
+}

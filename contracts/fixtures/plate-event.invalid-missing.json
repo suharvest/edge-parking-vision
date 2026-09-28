@@ -1,0 +1,28 @@
+{
+  "schema": "parking.plate/1",
+  "event_id": "0f1e2d3c-4b5a-4378-9a0b-1c2d3e4f5a6b",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a",
+  "ts": 1790000000789,
+  "seq": 2211,
+  "replayed": false,
+  "plate": "粤B12345",
+  "plate_normalized": "粤B12345",
+  "region": "cn",
+  "plate_type": "cn_blue",
+  "votes": 5,
+  "frames": 7,
+  "bbox": [
+    0.41,
+    0.62,
+    0.55,
+    0.67
+  ],
+  "track_id": 77,
+  "snapshot": {
+    "url": "http://camera.local:8080/snapshots/2211.jpg",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "width": 1920,
+    "height": 1080
+  }
+}

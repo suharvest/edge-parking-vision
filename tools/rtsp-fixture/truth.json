@@ -1,0 +1,36 @@
+{
+  "video": "truth_line.mp4",
+  "fps": 10,
+  "width": 640,
+  "height": 360,
+  "line": {
+    "a": [
+      0.5,
+      0.0
+    ],
+    "b": [
+      0.5,
+      1.0
+    ]
+  },
+  "note": "合成真值回放：车辆图块水平移动，计数线 x=0.5 竖线；direction: left->right=in, right->left=out",
+  "crossings": [
+    {
+      "t_ms": 3000,
+      "direction": "in"
+    },
+    {
+      "t_ms": 10000,
+      "direction": "out"
+    },
+    {
+      "t_ms": 15900,
+      "direction": "in",
+      "note": "dwell: 压线停留 8 帧再退回，只计 1 次"
+    },
+    {
+      "t_ms": 21800,
+      "direction": "in"
+    }
+  ]
+}

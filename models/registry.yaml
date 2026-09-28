@@ -1,0 +1,15 @@
+# 模型注册表（§S8.2）：只给转换与打包工具读，运行时不读。
+# 逻辑模型 + 各平台制品（sha256）；artifacts 由各平台转换脚本回写。
+models:
+  vehicle416:   {onnx: yolox_tiny_coco_416.onnx, task: yolox, input_hw: [416,416], num_classes: 80, mean: [0,0,0], std: [1,1,1], calib: evaluation/data/calib/vehicle_416.txt}
+  vehicle640:   {onnx: yolox_tiny_coco_640.onnx, task: yolox, input_hw: [640,640], num_classes: 80, mean: [0,0,0], std: [1,1,1], calib: evaluation/data/calib/vehicle_640.txt}
+  plate_det640: {onnx: plate_det_yolox_tiny_640.onnx, task: yolox, input_hw: [640,640], num_classes: 1, mean: [0,0,0], std: [1,1,1], calib: evaluation/data/calib/plate_det.txt}
+  plate_det416: {onnx: plate_det_yolox_tiny_416.onnx, task: yolox, input_hw: [416,416], num_classes: 1, mean: [0,0,0], std: [1,1,1], calib: evaluation/data/calib/plate_det.txt}
+  plate_rec_cn: {onnx: plate_rec_cn_96x32.onnx, task: ctc, input_hw: [32,96], num_classes: 66, mean: [0,0,0], std: [255,255,255], calib: evaluation/data/calib/plate_rec_cn.txt}
+  plate_rec_de: {onnx: plate_rec_de_96x32.onnx, task: ctc, input_hw: [32,96], num_classes: 37, mean: [0,0,0], std: [255,255,255], calib: evaluation/data/calib/plate_rec_de.txt}
+artifacts:          # 键 = 平台键；各平台转换脚本写入
+  cpu:          # C3：CPU 基座直接运行 onnx（docker 平台挂载 ./models:/models:ro）
+    vehicle416: {file: yolox_tiny_coco_416.onnx, sha256: "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7"}
+    vehicle640: {file: yolox_tiny_coco_640.onnx, sha256: "a885935b0ef432fc864327e3039570500467f568ce9c98b193e70525aa31de9"}
+  # rk3588 / rk3576 / jetson / hailo / recamera-pro / recamera-2002 由各平台
+  # 转换任务（X2–X6）回写，结构与 §S8.2 示例相同。

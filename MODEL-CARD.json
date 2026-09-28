@@ -1,0 +1,68 @@
+{
+  "model": "yolox_tiny_coco",
+  "variants": [
+    {
+      "name": "vehicle416",
+      "file": "models/yolox_tiny_coco_416.onnx",
+      "input_shape": [1, 3, 416, 416],
+      "output_shape": [1, 3549, 85],
+      "bytes": 20219662,
+      "sha256": "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7",
+      "usage": "NRD-2 出入口车辆检测（counting preset）"
+    },
+    {
+      "name": "vehicle640",
+      "file": "models/yolox_tiny_coco_640.onnx",
+      "input_shape": [1, 3, 640, 640],
+      "output_shape": [1, 8400, 85],
+      "bytes": 20219662,
+      "sha256": "a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9",
+      "usage": "NRD-4 停车场远景车位占用（slots preset）"
+    }
+  ],
+  "framework": "YOLOX",
+  "yolox_version": "0.3.0",
+  "yolox_weights_release": "0.1.1rc0",
+  "yolox_weights_url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_tiny.pth",
+  "yolox_weights_sha256": "9de513de589ac98bb92d3bca53b5af7b9acfa9b0bacb831f7999d0f7afaee8f0",
+  "yolox_commit": "release tag 0.1.1rc0（权重来源）；导出用 YOLOX 0.3.0 源码，commit 未记录",
+  "torch_version": "未记录（中断的导出任务未留版本日志；见 models/SHA256SUMS 备注）",
+  "onnx_version": "1.23.0",
+  "repo_commit": "（本仓库尚无 commit；全部文件为工作区新文件）",
+  "input_name": "images",
+  "opset": 11,
+  "decode_in_inference": false,
+  "preprocess": {
+    "color_order": "BGR",
+    "value_range": "0-255, no normalization",
+    "letterbox_pad": 114,
+    "align": "top_left"
+  },
+  "postprocess": "基座 vb-runtime yolox_decode + nms（BASE-1 §6.1）；本仓库不含后处理代码",
+  "classes": "COCO 80 类（预设只取 car=2, motorcycle=3, bus=5, truck=7）",
+  "num_classes": 80,
+  "licenses_three_layer": {
+    "code": {
+      "component": "YOLOX 代码（导出用）",
+      "license": "Apache-2.0",
+      "text": "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE",
+      "commercial_use": true,
+      "attribution": "保留 NOTICE"
+    },
+    "weights": {
+      "component": "yolox_tiny.pth（Megvii-BaseDetection release 0.1.1rc0）",
+      "license": "随 release 以 Apache-2.0 LICENSE 一并发布；权重的授权声明独立于代码许可，见 BASE-1 §7.1",
+      "text": "https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE",
+      "commercial_use": "按用户 2026-09-26 决策继续使用（测试与基准用途）；本仓库不分发 .pth",
+      "attribution": "NOTICE 记录 release tag 与 sha256"
+    },
+    "training_data": {
+      "component": "COCO 2017（预训练数据）",
+      "license": "标注 CC BY 4.0；图片版权归各 Flickr 作者",
+      "text": "https://cocodataset.org/#termsofuse（原文见 URD-2 §7.3）",
+      "commercial_use": "不写「COCO 可商用」；不分发 COCO 图片；本 ONNX 为其派生权重，商用判断按 BASE-1 §7.1 记录口径",
+      "attribution": "署名 COCO Consortium"
+    }
+  },
+  "cache_key_note": "A downstream rknn/hef/cvimodel/engine cache hit requires ALL of: onnx sha256 + target device + builder profile + runtime ABI."
+}

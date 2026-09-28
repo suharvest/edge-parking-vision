@@ -1,0 +1,8 @@
+# username,role,password
+# role ∈ device | gate | operator | viewer（§S12）
+# password 列留空时 install.sh 生成随机口令并只打印一次
+demo-lot-gate-a,device,
+demo-lot-gate-b,device,
+r1124-gate,gate,
+ops-alice,operator,
+dashboard,viewer,

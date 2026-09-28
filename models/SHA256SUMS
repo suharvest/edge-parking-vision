@@ -1,0 +1,17 @@
+427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7  yolox_tiny_coco_416.onnx
+a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9  yolox_tiny_coco_640.onnx
+
+# metadata (not part of the checksum lines)
+# model         : YOLOX-Tiny, COCO 2017 pretrained (release 0.1.1rc0 weights, sha256
+#                 9de513de589ac98bb92d3bca53b5af7b9acfa9b0bacb831f7999d0f7afaee8f0,
+#                 40755013 bytes; weights NOT in repo)
+# yolox_version : 0.3.0 (PYTHONPATH, not pip installed)
+# onnx_version  : 1.23.0
+# torch_version : not recorded by the interrupted export task; re-export and update
+#                 this file together with MODEL-CARD.json before any conversion
+# opset         : 11, decode_in_inference=False, static batch 1
+# input         : images:1x3x416x416 / images:1x3x640x640, BGR 0-255, letterbox pad 114,
+#                 top-left aligned (NRD-2 §S5)
+# classes       : COCO 80 (used subset: car=2, motorcycle=3, bus=5, truck=7)
+# size          : yolox_tiny_coco_416.onnx = 20219662 bytes
+# size          : yolox_tiny_coco_640.onnx = 20219662 bytes

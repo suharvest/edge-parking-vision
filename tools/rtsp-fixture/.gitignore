@@ -1,0 +1,2 @@
+# 真值回放视频（make_truth.py 产物，可用其重新生成，不入库）
+tools/rtsp-fixture/truth_line.mp4

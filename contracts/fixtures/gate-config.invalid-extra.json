@@ -1,0 +1,24 @@
+{
+  "site_id": "demo-lot",
+  "device_id": "r1124-gate",
+  "mqtt": {
+    "host": "localhost",
+    "port": 1883,
+    "username": "demo-lot-r1124-gate",
+    "password": "",
+    "keepalive_s": 30
+  },
+  "http": {
+    "port": 8081
+  },
+  "state_dir": "/var/lib/edge-parking",
+  "whitelist_path": "/var/lib/edge-parking/whitelist.csv",
+  "do_line": "DO1",
+  "pulse_ms": 500,
+  "min_interval_s": 5,
+  "subscribe_cameras": [
+    "gate-a"
+  ],
+  "gate_id": "gate-a-barrier",
+  "relay": "NO"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "parking.plate_crop/1",
+  "event_id": "0f1e2d3c-4b5a-4378-9a0b-1c2d3e4f5a6b",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a",
+  "ts": 1790000003100,
+  "seq": 2212,
+  "replayed": false,
+  "track_id": 77,
+  "crops_sent": 3,
+  "track_closed": true,
+  "snapshot": {
+    "url": "http://camera.local:8080/snapshots/2211.jpg",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "width": 1920,
+    "height": 1080
+  }
+}

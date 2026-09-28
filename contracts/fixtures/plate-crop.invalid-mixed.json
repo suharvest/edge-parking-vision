@@ -1,0 +1,26 @@
+{
+  "schema": "parking.plate_crop/1",
+  "event_id": "0f1e2d3c-4b5a-4378-9a0b-1c2d3e4f5a6b",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a",
+  "ts": 1790000000789,
+  "seq": 2211,
+  "replayed": false,
+  "track_id": 77,
+  "crop_index": 0,
+  "max_picks": 3,
+  "track_closed": true,
+  "det_score": 0.88,
+  "bbox": [
+    0.41,
+    0.62,
+    0.55,
+    0.67
+  ],
+  "crop": {
+    "url": "http://camera.local:8080/crops/2209.jpg",
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "width": 192,
+    "height": 64
+  }
+}

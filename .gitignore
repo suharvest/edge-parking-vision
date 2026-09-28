@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# 模型与权重不入库（§S1 / §S5）
+models/*.onnx
+models/*.rknn
+models/*.hef
+models/*.cvimodel
+models/*.engine
+training/weights/
+
+# 合成字体不入库（training/fonts/README.md 有下载地址与许可存档）
+training/fonts/*.otf
+training/fonts/*.ttf
+training/fonts/*.ttc
+# 合成样张不入库（样张在训练环境产出）
+training/samples/
+
+# 测试素材（§S6：test 集自拍视频不外发；仅索引入库）
+evaluation/data/private/
+evaluation/runs/*/

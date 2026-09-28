@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "whitelist.schema.json",
+  "description": "NRD-3 §6.3 白名单 CSV 的一行（解析后的对象）。CSV 首行表头固定为 plate,label,valid_from,valid_until；plate 必填，label ≤64 字符，有效期为 YYYY-MM-DD 或空（不限）。匹配为 normalize() 后精确匹配。",
+  "type": "object",
+  "required": ["plate"],
+  "properties": {
+    "plate":       {"type": "string", "minLength": 1},
+    "label":       {"type": "string", "maxLength": 64},
+    "valid_from":  {"type": "string", "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+    "valid_until": {"type": "string", "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,20 @@
+# role=device：识别/计数/车位端（事件 + 基座 status/ack，读控制）
+topic write +/parking/+/status
+topic write +/parking/+/cmd/ack
+topic read  +/parking/+/cmd/control
+topic write +/parking/+/crossing
+topic write +/parking/+/occupancy
+topic write +/parking/+/plate
+topic write +/parking/+/plate_crop
+topic write +/parking/+/slots
+# role=gate：R1124 本机的 gate-controller 与 plate-host
+topic read  +/parking/+/plate
+topic read  +/parking/+/plate_crop
+topic write +/parking/+/plate
+topic write +/parking/+/gate
+topic write +/parking/+/status
+# role=operator：运维（增删流、改阈值）
+topic write +/parking/+/cmd/control
+topic read  +/parking/#
+# role=viewer：看板、集成商、余位屏
+topic read  +/parking/#

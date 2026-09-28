@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "gate-event.schema.json",
+  "description": "NRD-3 §6.2 开闸事件（…/gate，R1124 gate 服务发布）。",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [
+    {"$ref": "envelope.schema.json"},
+    {
+      "type": "object",
+      "required": ["action", "trigger", "plate_event_id", "plate_normalized",
+                   "whitelist_label", "pulse_ms", "latency_ms"],
+      "properties": {
+        "schema":           {"const": "parking.gate/1"},
+        "action":           {"enum": ["open_pulse", "suppressed"], "description": "suppressed = 命中但处于 min_interval_s 冷却"},
+        "trigger":          {"enum": ["whitelist", "manual_test"]},
+        "plate_event_id":   {"type": "string", "format": "uuid", "description": "触发的 plate 事件 id"},
+        "plate_normalized": {"type": "string", "minLength": 1},
+        "whitelist_label":  {"type": "string", "maxLength": 64},
+        "pulse_ms":         {"type": "integer", "minimum": 1},
+        "latency_ms":       {"type": "integer", "minimum": 0, "description": "DO 动作时刻 − plate 事件 ts"}
+      }
+    }
+  ]
+}

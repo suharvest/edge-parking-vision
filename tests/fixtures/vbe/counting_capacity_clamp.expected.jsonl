@@ -1,0 +1,4 @@
+{"kind": "crossing", "body": {"direction": "in", "track_id": 31, "vehicle_class": "car", "confidence": 0.9, "occupancy_after": 1, "free_after": 0}, "ts": 1790000006000}
+{"kind": "crossing", "body": {"direction": "in", "track_id": 32, "vehicle_class": "car", "confidence": 0.9, "occupancy_after": 2, "free_after": 0}, "ts": 1790000007000}
+{"kind": "crossing", "body": {"direction": "in", "track_id": 33, "vehicle_class": "car", "confidence": 0.9, "occupancy_after": 2, "free_after": 0}, "ts": 1790000008000}
+{"final": {"occupancy": 2, "in_today": 3, "out_today": 0, "free": 0}}

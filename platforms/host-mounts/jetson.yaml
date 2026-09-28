@@ -1,0 +1,22 @@
+# jetson 宿主挂载（规格 §S11.2 bases.jetson.host_mounts；§S11.3 compose 以此 ∪ 通用三项生成 volumes/devices/tmpfs）。
+#
+# 来源说明（重要）：规格 §S1 要求本文件「从 retail-vision 同一 tag 的 platforms/host-mounts/ 原样拷来」，
+# 但 retail-vision（feat/vision-base，截至 X0 执行）没有 platforms/ 目录——上游缺失，已按 §S13 汇报。
+# 以下内容按规格 §S11.1 历史记录的来源推导：fall-detection@5af128d platforms/jetson/docker-compose.yml
+# 的宿主挂载（基座 M2.2 并入 vision-base-jetson 的同一来源）。非上游拷贝，待上游提供后须原样替换并比对 sha256。
+# 挂载目标路径以 BASE-1 M2.2 基座镜像内布局为准，需核实。
+volumes:
+  # 宿主 TensorRT/CUDA 为权威版本，避免与基座镜像内 TRT ABI 不一致（fall compose 注释原意）。
+  - /usr/lib/aarch64-linux-gnu/libnvinfer.so.10:/host-trt/libnvinfer.so.10:ro
+  - /usr/lib/aarch64-linux-gnu/libnvinfer_plugin.so.10:/host-trt/libnvinfer_plugin.so.10:ro
+  - /usr/lib/aarch64-linux-gnu/libnvonnxparser.so.10:/host-trt/libnvonnxparser.so.10:ro
+  - /usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu:ro
+  - /usr/local/cuda:/usr/local/cuda:ro
+  - /usr/src/tensorrt:/usr/src/tensorrt:ro
+  - /usr/lib/aarch64-linux-gnu/nvidia:/host-nvidia:ro
+devices:
+  - /dev:/dev
+environment:
+  NVIDIA_VISIBLE_DEVICES: all
+  NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+  LD_LIBRARY_PATH: /usr/local/cuda/lib64:/host-nvidia:/host-trt:/usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu/nvidia

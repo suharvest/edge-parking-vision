@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "app-options.schema.json",
+  "description": "vb.config/1 中 app.options 的停车部分（NRD-2 §S2）。三个分支：counting（NRD-2 C0）、plate（NRD-3 P0，本期仅 region=cn，NRD-3 §0.1）、slots（NRD-4 P0）；同一 payload 只能属于一个分支（oneOf）。",
+  "type": "object",
+  "required": ["site_id", "mqtt", "http", "spool"],
+  "properties": {
+    "site_id":  {"type": "string", "pattern": "^[a-z0-9-]{1,32}$"},
+    "mqtt": {
+      "type": "object",
+      "required": ["host", "port", "username", "password", "keepalive_s"],
+      "properties": {
+        "host":        {"type": "string", "minLength": 1},
+        "port":        {"type": "integer", "minimum": 1, "maximum": 65535},
+        "username":    {"type": "string"},
+        "password":    {"type": "string"},
+        "keepalive_s": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "http": {
+      "type": "object",
+      "required": ["port"],
+      "properties": {
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+      },
+      "additionalProperties": false
+    },
+    "classes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "integer", "enum": [2, 3, 5, 7]},
+      "description": "counting 分支必需"
+    },
+    "spool": {
+      "type": "object",
+      "required": ["max_events"],
+      "properties": {
+        "max_events": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "preview_frame_stride": {"type": "integer", "minimum": 1, "description": "counting / plate 预览抽样"},
+    "events_out": {"type": "string", "description": "§S9 回放：事件落盘路径（jsonl）；不设置则不落盘"},
+    "counting": {"$ref": "#/$defs/counting"},
+    "plate":    {"$ref": "#/$defs/plate"},
+    "target_fps":      {"type": "integer", "minimum": 1, "description": "slots 分支：每路采样帧率（options.max_fps，NRD-2 §S13 B8）"},
+    "unknown_after_s": {"type": "number", "minimum": 0, "description": "slots 分支：断流超过该时长后全 unknown、stream_ok=false"},
+    "slot_coverage": {
+      "type": "object",
+      "description": "slots 分支：基座 slot_coverage 分析器参数（覆盖框、滞回与去抖在基座，NRD-4 §6.2）",
+      "required": ["occupied_ratio", "free_ratio", "hold_s", "free_hold_s", "classes"],
+      "properties": {
+        "occupied_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+        "free_ratio":     {"type": "number", "minimum": 0, "maximum": 1},
+        "hold_s":         {"type": "number", "minimum": 0},
+        "free_hold_s":    {"type": "number", "minimum": 0},
+        "classes":        {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}}
+      },
+      "additionalProperties": false
+    },
+    "slots": {
+      "type": "object",
+      "description": "slots 分支：每路车位表，key 为 stream_id，value 为 [{id, polygon}]（NRD-4 §5.3）"
+    }
+  },
+  "additionalProperties": false,
+  "oneOf": [
+    {"required": ["counting", "classes", "preview_frame_stride"]},
+    {"required": ["plate"]},
+    {"required": ["target_fps", "unknown_after_s", "slot_coverage", "slots"]}
+  ],
+  "$defs": {
+    "counting": {
+      "type": "object",
+      "required": ["line", "in_side", "count_directions", "band", "segment_margin",
+                   "min_track_frames", "min_travel", "reborn_window_s", "reborn_dist",
+                   "capacity", "initial_occupancy", "publish_interval_ms"],
+      "properties": {
+        "line": {
+          "type": "object",
+          "required": ["a", "b"],
+          "properties": {
+            "a": {"$ref": "#/$defs/point"},
+            "b": {"$ref": "#/$defs/point"}
+          },
+          "additionalProperties": false
+        },
+        "in_side":           {"enum": ["positive", "negative"]},
+        "count_directions":  {"type": "array", "minItems": 1, "items": {"enum": ["in", "out"]}},
+        "band":              {"type": "number", "minimum": 0},
+        "segment_margin":    {"type": "number", "minimum": 0},
+        "min_track_frames":  {"type": "integer", "minimum": 1},
+        "min_travel":        {"type": "number", "minimum": 0},
+        "reborn_window_s":   {"type": "number", "minimum": 0},
+        "reborn_dist":       {"type": "number", "minimum": 0},
+        "capacity":          {"type": "integer", "minimum": 0},
+        "initial_occupancy": {"type": "integer", "minimum": 0},
+        "publish_interval_ms": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "plate": {
+      "type": "object",
+      "description": "NRD-3 §5.4。full 模式配置 stage2 与 vote；detect_only（仅 SG2002 降级）不配置两者，改用 crop_picker。",
+      "required": ["mode", "region", "roi", "dedup_s", "snapshot_dir",
+                   "snapshot_retention_days", "snapshot_max_mb"],
+      "properties": {
+        "mode":                     {"enum": ["full", "detect_only"]},
+        "region":                   {"enum": ["cn"], "description": "本期仅中国大陆制式（NRD-3 §0.1）；de 暂缓，不得出现"},
+        "roi": {
+          "type": "array",
+          "minItems": 3,
+          "items": {"$ref": "#/$defs/point"},
+          "description": "车道检测 ROI，源归一化多边形"
+        },
+        "stage2":      {"$ref": "#/$defs/plate_stage2"},
+        "vote":        {"$ref": "#/$defs/plate_vote"},
+        "crop_picker": {"$ref": "#/$defs/plate_crop_picker"},
+        "dedup_s":                   {"type": "number", "minimum": 0, "description": "同 camera 同牌去重窗口（钩子层，跨轨迹）"},
+        "snapshot_dir":              {"type": "string", "minLength": 1},
+        "snapshot_retention_days":   {"type": "integer", "minimum": 1},
+        "snapshot_max_mb":           {"type": "number", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "plate_stage2": {
+      "type": "object",
+      "required": ["model_path", "input_hw", "classes", "expand", "max_per_track", "color", "scale", "backend"],
+      "properties": {
+        "model_path":    {"type": "string", "minLength": 1},
+        "input_hw": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": "integer", "minimum": 1}
+        },
+        "classes":       {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
+        "expand":        {"type": "number", "minimum": 0, "description": "裁切扩边比例"},
+        "max_per_track": {"type": "integer", "minimum": 1},
+        "color":         {"enum": ["rgb", "bgr"]},
+        "scale":         {"type": "number", "minimum": 0, "description": "像素归一化系数，如 1/255=0.0039215686"},
+        "backend":       {"type": "string", "description": "空串 = 跟随 backend.name；可为 \"cpu\" 回退"}
+      },
+      "additionalProperties": false
+    },
+    "plate_vote": {
+      "type": "object",
+      "required": ["window", "min_agree", "min_conf", "flush_min_agree"],
+      "properties": {
+        "window":          {"type": "integer", "minimum": 1},
+        "min_agree":       {"type": "integer", "minimum": 1},
+        "min_conf":        {"type": "number", "minimum": 0, "maximum": 1},
+        "flush_min_agree": {"type": "integer", "minimum": 0, "description": "0 = 轨迹结束不补发"}
+      },
+      "additionalProperties": false
+    },
+    "plate_crop_picker": {
+      "type": "object",
+      "required": ["max_picks", "min_gap_s", "min_score", "improve"],
+      "properties": {
+        "max_picks":  {"type": "integer", "minimum": 1},
+        "min_gap_s":  {"type": "number", "minimum": 0},
+        "min_score":  {"type": "number", "minimum": 0, "maximum": 1},
+        "improve":    {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "point": {
+      "type": "array",
+      "items": {"type": "number", "minimum": 0, "maximum": 1},
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "源归一化坐标 [x, y]"
+    }
+  }
+}

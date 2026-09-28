@@ -1,0 +1,2 @@
+{"kind": "crossing", "body": {"direction": "in", "track_id": 1, "vehicle_class": "car", "confidence": 0.82, "occupancy_after": 1, "free_after": 9}, "ts": 1790000000123}
+{"final": {"occupancy": 1, "in_today": 1, "out_today": 0, "free": 9}}

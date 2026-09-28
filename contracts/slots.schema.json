@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slots.schema.json",
+  "description": "NRD-4 §6.1 车位状态消息（…/slots，retained；camera_id = stream_id）。",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [
+    {"$ref": "envelope.schema.json"},
+    {
+      "type": "object",
+      "required": ["changed", "slots", "occupied", "free", "unknown", "stream_ok"],
+      "properties": {
+        "schema":    {"const": "parking.slots/1"},
+        "changed":   {"type": "array", "items": {"type": "string", "minLength": 1}, "description": "本次发生状态变化的车位 id"},
+        "slots":     {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "state", "since", "cover"],
+            "properties": {
+              "id":    {"type": "string", "minLength": 1},
+              "state": {"enum": ["occupied", "free", "unknown"]},
+              "since": {"type": "integer", "minimum": 0, "description": "进入当前状态的 epoch ms"},
+              "cover": {"type": "number", "minimum": 0, "maximum": 1, "description": "最近一次 slot_change 的覆盖率"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "occupied":  {"type": "integer", "minimum": 0},
+        "free":      {"type": "integer", "minimum": 0},
+        "unknown":   {"type": "integer", "minimum": 0},
+        "stream_ok": {"type": "boolean", "description": "断流超过 unknown_after_s 后置 false 并全 unknown"}
+      }
+    }
+  ]
+}

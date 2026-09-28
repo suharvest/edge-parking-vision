@@ -1,0 +1,15 @@
+{
+  "schema": "parking.crossing/1",
+  "event_id": "4b1c7c1e-2f7a-4a8e-9a55-2f1f1d3b9e10",
+  "site_id": "demo-lot",
+  "camera_id": "gate-a",
+  "ts": 1790000000123,
+  "seq": 1042,
+  "replayed": false,
+  "direction": "in",
+  "track_id": 381,
+  "vehicle_class": "car",
+  "confidence": 0.82,
+  "occupancy_after": 57,
+  "free_after": 63
+}

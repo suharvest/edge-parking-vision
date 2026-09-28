@@ -1,0 +1,4 @@
+{"meta": {"stream_id": "gate-a", "counting": {"in_side": "negative", "capacity": 1, "initial_occupancy": 0}}}
+{"seq": 1, "wall_ms": 1790000006000.0, "type": "line_cross", "track_id": 31, "fields": {"line_id": "main", "direction": "forward", "anchor": [0.52, 0.6], "class_id": 2, "score": 0.90}}
+{"seq": 2, "wall_ms": 1790000007000.0, "type": "line_cross", "track_id": 32, "fields": {"line_id": "main", "direction": "forward", "anchor": [0.52, 0.6], "class_id": 2, "score": 0.90}}
+{"seq": 3, "wall_ms": 1790000008000.0, "type": "line_cross", "track_id": 33, "fields": {"line_id": "main", "direction": "forward", "anchor": [0.52, 0.6], "class_id": 2, "score": 0.90}}
