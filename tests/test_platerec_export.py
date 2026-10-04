@@ -24,6 +24,9 @@ if sys_path not in sys.path:
 
 ONNX = Path(__file__).resolve().parents[1] / "models" / "plate_rec_cn_96x32.onnx"
 
+# ONNX 被 gitignore（新克隆不存在）：模块级 skip，保证仓库默认 pytest 仍绿
+pytestmark = pytest.mark.skipif(not ONNX.exists(), reason="plate_rec_cn_96x32.onnx 未导出")
+
 ALLOWED = {"Conv", "Relu", "MaxPool", "AveragePool", "Concat", "Add"}
 FORBIDDEN = {"Softmax", "LogSoftmax", "Squeeze", "AdaptiveAvgPool"}
 

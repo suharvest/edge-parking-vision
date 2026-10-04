@@ -206,6 +206,29 @@ def decode_texts(pred_ids: list[list[int]], idx2char: list[str]) -> list[str]:
     return out
 
 
+def ctc_loss(ctc: nn.CTCLoss, log_probs: torch.Tensor, labels: torch.Tensor,
+             target_lengths: torch.Tensor) -> torch.Tensor:
+    """正确的 CTC loss：input_lengths = T（每样本都相同），不是 target 长度。
+
+    log_probs 形状 (T,N,C)。曾把 target_lengths 误传为 input_lengths，导致对齐窗口
+    被掐到 target 长度：含相邻重复字符的车牌（如 皖AD18887）不可行（zero_infinity
+    静默记 0），无重复样本也失去对齐自由度。
+    """
+    T, N = log_probs.size(0), log_probs.size(1)
+    tl = target_lengths.to(log_probs.device)
+    if int(tl.max()) > T:
+        raise ValueError(f"CTC infeasible: target length {int(tl.max())} > T={T}")
+    # 断言：每样本 target 长度 + 相邻重复字符数 <= T，否则 CTC 对齐不可行，直接报错
+    need = 0
+    for lab in torch.split(labels.cpu(), target_lengths.cpu().tolist()):
+        L = lab.tolist()
+        need = max(need, len(L) + sum(1 for a, b in zip(L, L[1:]) if a == b))
+    if need > T:
+        raise ValueError(f"CTC infeasible: max(target_len + adjacent_repeats) = {need} > T={T}")
+    input_lengths = torch.full((N,), T, dtype=torch.long, device=log_probs.device)
+    return ctc(log_probs, labels.to(log_probs.device), input_lengths, tl)
+
+
 @torch.no_grad()
 def evaluate(model, loader, device, idx2char) -> tuple[float, float]:
     model.eval()
@@ -216,8 +239,8 @@ def evaluate(model, loader, device, idx2char) -> tuple[float, float]:
         x = x.to(device, non_blocking=True)
         logits = model(x).squeeze(2)  # (N,C,T)（导出图为 (N,C,1,T)，训练侧压缩 H=1）
         log_probs = logits.log_softmax(1).permute(2, 0, 1)  # (T,N,C)
-        loss = ctc(log_probs, labels.to(device), lengths.to(device), lengths)
-        loss_sum += float(loss) * len(x)
+        loss = ctc_loss(ctc, log_probs, labels, lengths)
+        loss_sum += float(loss.detach()) * len(x)
         n += len(x)
         texts = decode_texts(greedy_decode(logits), idx2char)
         gts = ["".join(idx2char[int(t)] for t in lab) for lab in torch.split(labels, list(lengths))]
@@ -302,7 +325,9 @@ def main(argv: list[str] | None = None) -> int:
         opt.load_state_dict(ck["optimizer"])
         sched.load_state_dict(ck["scheduler"])
         start_epoch = ck["epoch"] + 1
-        log(f"[resume] from {args.resume} at epoch {start_epoch}")
+        best_acc = float(ck.get("best_acc", -1.0))
+        main._best = best_acc
+        log(f"[resume] from {args.resume} at epoch {start_epoch} (best_acc={best_acc:.4f})")
 
     log(f"[train] epochs={args.epochs} batch={args.batch_size} steps/epoch={steps_per_epoch} workers={nw}")
 
@@ -314,18 +339,19 @@ def main(argv: list[str] | None = None) -> int:
             x = x.to(device, non_blocking=True)
             logits = model(x).squeeze(2)
             log_probs = logits.log_softmax(1).permute(2, 0, 1)  # (T,N,C) for CTCLoss
-            loss = ctc(log_probs, labels.to(device), lengths.to(device), lengths)
+            loss = ctc_loss(ctc, log_probs, labels, lengths)
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
             sched.step()
-            run_loss += float(loss)
+            run_loss += float(loss.detach())
             if (step + 1) % args.mem_check_interval == 0:
                 r = rss_gb()
                 if r > args.max_rss_gb:
                     ckpt = args.out / "last_ckpt.pth"
                     torch.save({"model": model.state_dict(), "optimizer": opt.state_dict(),
-                                "scheduler": sched.state_dict(), "epoch": epoch}, ckpt)
+                                "scheduler": sched.state_dict(), "epoch": epoch,
+                                "best_acc": getattr(main, "_best", -1.0)}, ckpt)
                     log(f"[mem-guard] RSS {r:.1f} GB > max {args.max_rss_gb} GB; "
                         f"checkpoint saved to {ckpt}; exiting (reason=rss-limit)")
                     log_f.close()
@@ -336,10 +362,13 @@ def main(argv: list[str] | None = None) -> int:
         cuda_peak = torch.cuda.max_memory_allocated() / 1048576 if device.type == "cuda" else 0.0
         torch.save({"model": model.state_dict(), "optimizer": opt.state_dict(),
                     "scheduler": sched.state_dict(), "epoch": epoch,
-                    "val_acc": val_acc}, args.out / "last_ckpt.pth")
-        if not hasattr(main, "_best") or val_acc > main._best:
+                    "val_acc": val_acc, "best_acc": getattr(main, "_best", -1.0)},
+                   args.out / "last_ckpt.pth")
+        if val_acc > getattr(main, "_best", -1.0):
             main._best = val_acc
             torch.save(model.state_dict(), args.out / "best.pth")
+            torch.save({"model": model.state_dict(), "epoch": epoch, "val_acc": val_acc},
+                       args.out / "best_ckpt.pth")
         log(f"[epoch {epoch}] loss={run_loss / steps_per_epoch:.4f} val_loss={val_loss:.4f} "
             f"val_acc={val_acc:.4f} epoch_time={epoch_s:.1f}s peak_rss={peak_rss:.2f}GB "
             f"cuda_peak_alloc={cuda_peak:.0f}MB mem_available={mem_available_gb():.1f}GB")
