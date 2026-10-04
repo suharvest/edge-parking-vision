@@ -1,5 +1,7 @@
 427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7  yolox_tiny_coco_416.onnx
 a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9  yolox_tiny_coco_640.onnx
+40be2053a658ceae5a9c94cf93f98a13822513d42e57bf661e4c1f3eb978e428  plate_det_yolox_tiny_640.onnx
+d1bc8539fe225cfa04e9082d105a8f7f9a4f8bff6fb777a6468ba3937dab54cd  plate_det_yolox_tiny_416.onnx
 
 # metadata (not part of the checksum lines)
 # model         : YOLOX-Tiny, COCO 2017 pretrained (release 0.1.1rc0 weights, sha256
@@ -7,11 +9,27 @@ a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9  yolox_tiny_coc
 #                 40755013 bytes; weights NOT in repo)
 # yolox_version : 0.3.0 (PYTHONPATH, not pip installed)
 # onnx_version  : 1.23.0
-# torch_version : not recorded by the interrupted export task; re-export and update
-#                 this file together with MODEL-CARD.json before any conversion
+# onnxruntime   : 1.30.0 (shape check)
+# torch_version : 2.14.0+cu130
 # opset         : 11, decode_in_inference=False, static batch 1
 # input         : images:1x3x416x416 / images:1x3x640x640, BGR 0-255, letterbox pad 114,
 #                 top-left aligned (NRD-2 §S5)
 # classes       : COCO 80 (used subset: car=2, motorcycle=3, bus=5, truck=7)
 # size          : yolox_tiny_coco_416.onnx = 20219662 bytes
 # size          : yolox_tiny_coco_640.onnx = 20219662 bytes
+#
+# metadata for the NRD-3 plate detector artefacts (derived from the YOLOX-Tiny
+# COCO weights above, fine-tuned 40 epochs on CCPD plate data)
+# model         : YOLOX-Tiny, 1 class "plate" (num_classes=1)
+# train_weights : training/outputs/yolox_tiny_plate/best_ckpt.pth (40578275 bytes,
+#                 2026-09-28; weights NOT in repo)
+# torch_version : 2.14.0+cu130
+# onnx_version  : 1.23.0
+# onnxruntime   : 1.30.0 (shape check)
+# opset         : 11, decode_in_inference=False, static batch 1
+# input         : images:1x3x640x640 / images:1x3x416x416, BGR 0-255,
+#                 letterbox pad 114, top-left aligned (NRD-2 §S5)
+# output        : 1x8400x6 (640) / 1x3549x6 (416); 6 = 4 bbox + 1 obj + 1 class
+# best_ap       : 80.02 (train_log.txt: "the best AP is 80.02"; AP50=0.990)
+# size          : plate_det_yolox_tiny_640.onnx = 20167160 bytes
+# size          : plate_det_yolox_tiny_416.onnx = 20167160 bytes

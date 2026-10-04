@@ -18,6 +18,24 @@
       "bytes": 20219662,
       "sha256": "a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9",
       "usage": "NRD-4 停车场远景车位占用（slots preset）"
+    },
+    {
+      "name": "plate_det640",
+      "file": "models/plate_det_yolox_tiny_640.onnx",
+      "input_shape": [1, 3, 640, 640],
+      "output_shape": [1, 8400, 6],
+      "bytes": 20167160,
+      "sha256": "40be2053a658ceae5a9c94cf93f98a13822513d42e57bf661e4c1f3eb978e428",
+      "usage": "NRD-3 车牌检测 640²（camera/rk3588 等平台主用；高精度）"
+    },
+    {
+      "name": "plate_det416",
+      "file": "models/plate_det_yolox_tiny_416.onnx",
+      "input_shape": [1, 3, 416, 416],
+      "output_shape": [1, 3549, 6],
+      "bytes": 20167160,
+      "sha256": "d1bc8539fe225cfa04e9082d105a8f7f9a4f8bff6fb777a6468ba3937dab54cd",
+      "usage": "NRD-3 车牌检测 416²（SG2002/reCamera 等低算力平台）"
     }
   ],
   "framework": "YOLOX",
@@ -26,8 +44,19 @@
   "yolox_weights_url": "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_tiny.pth",
   "yolox_weights_sha256": "9de513de589ac98bb92d3bca53b5af7b9acfa9b0bacb831f7999d0f7afaee8f0",
   "yolox_commit": "release tag 0.1.1rc0（权重来源）；导出用 YOLOX 0.3.0 源码，commit 未记录",
-  "torch_version": "未记录（中断的导出任务未留版本日志；见 models/SHA256SUMS 备注）",
+  "torch_version": "2.14.0+cu130",
   "onnx_version": "1.23.0",
+  "onnxruntime_version": "1.30.0",
+  "plate_det": {
+    "model": "yolox_tiny_plate",
+    "num_classes": 1,
+    "classes": ["车牌"],
+    "train_weights": "training/outputs/yolox_tiny_plate/best_ckpt.pth (40578275 bytes, 2026-09-28; weights NOT in repo)",
+    "train_epochs": 40,
+    "train_data": "CCPD2019 ccpd_base 5 万张 + CCPD2020 ccpd_green；val = CCPD2019 5% + ccpd2020 val",
+    "best_ap": "80.02（train_log.txt 原始行：'the best AP is 80.02'）",
+    "ap50": "0.990（train_log.txt 原始行：'AP @[ IoU=0.50 ... ] = 0.990'）"
+  },
   "repo_commit": "（本仓库尚无 commit；全部文件为工作区新文件）",
   "input_name": "images",
   "opset": 11,
