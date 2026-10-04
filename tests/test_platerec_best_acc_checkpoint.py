@@ -14,6 +14,8 @@ from pathlib import Path
 import pytest
 
 torch = pytest.importorskip("torch")
+cv2 = pytest.importorskip("cv2")
+np = pytest.importorskip("numpy")
 
 sys_path = str(Path(__file__).resolve().parents[1] / "training")
 import sys  # noqa: E402
@@ -28,11 +30,25 @@ def test_last_ckpt_best_acc_includes_final_improving_epoch(tmp_path, monkeypatch
     vals = iter([0.20, 0.50, 0.90])
     monkeypatch.setattr(train_platerec, "evaluate", lambda *a, **k: (next(vals), 0.0))
 
+    # 自包含：stub 掉 build_items，用 tmp_path 临时生成 1 张真图，避免依赖本机数据。
+    img_path = tmp_path / "RB_LB_LT_RT_皖A12345_0.jpg"
+    assert cv2.imwrite(str(img_path), np.full((32, 96, 3), 128, dtype=np.uint8))
+    corners = np.array([
+        [96, 32], [0, 32], [0, 0], [96, 0],  # RB, LB, LT, RT（warp_crop 约定）
+    ], dtype=np.float32)
+
+    def fake_build_items(manifests, rec_root, limit):
+        return ([str(img_path)], ["皖A12345"], [corners])
+
+    monkeypatch.setattr(train_platerec, "build_items", fake_build_items)
+    monkeypatch.setattr(train_platerec, "mem_available_gb", lambda: 999.0)
+
     out = tmp_path / "out"
     rc = train_platerec.main([
-        "--data-root", "/home/harvest/edge-parking-vision",
+        "--data-root", str(tmp_path),
         "--epochs", "3", "--batch-size", "8", "--num-workers", "0",
-        "--limit", "0", "--val-limit", "0", "--out", str(out),
+        "--limit", "1", "--val-limit", "1", "--out", str(out),
+        "--min-mem-available-gb", "0",
     ])
     assert rc == 0
 
