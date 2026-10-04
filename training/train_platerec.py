@@ -360,15 +360,16 @@ def main(argv: list[str] | None = None) -> int:
         epoch_s = time.time() - t0
         peak_rss = rss_gb()
         cuda_peak = torch.cuda.max_memory_allocated() / 1048576 if device.type == "cuda" else 0.0
-        torch.save({"model": model.state_dict(), "optimizer": opt.state_dict(),
-                    "scheduler": sched.state_dict(), "epoch": epoch,
-                    "val_acc": val_acc, "best_acc": getattr(main, "_best", -1.0)},
-                   args.out / "last_ckpt.pth")
+        # 先更新 best，再写 last_ckpt，确保 checkpoint 里的 best_acc 已包含本 epoch。
         if val_acc > getattr(main, "_best", -1.0):
             main._best = val_acc
             torch.save(model.state_dict(), args.out / "best.pth")
             torch.save({"model": model.state_dict(), "epoch": epoch, "val_acc": val_acc},
                        args.out / "best_ckpt.pth")
+        torch.save({"model": model.state_dict(), "optimizer": opt.state_dict(),
+                    "scheduler": sched.state_dict(), "epoch": epoch,
+                    "val_acc": val_acc, "best_acc": getattr(main, "_best", -1.0)},
+                   args.out / "last_ckpt.pth")
         log(f"[epoch {epoch}] loss={run_loss / steps_per_epoch:.4f} val_loss={val_loss:.4f} "
             f"val_acc={val_acc:.4f} epoch_time={epoch_s:.1f}s peak_rss={peak_rss:.2f}GB "
             f"cuda_peak_alloc={cuda_peak:.0f}MB mem_available={mem_available_gb():.1f}GB")
