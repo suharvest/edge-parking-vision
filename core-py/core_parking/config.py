@@ -273,6 +273,7 @@ class ParkingApp(ParkingHooks):
 
     def __init__(self) -> None:
         super().__init__()
+        self.plate_hooks = None
         self.recent_events: deque = deque(maxlen=self.recent_limit)
         self.events_out: str | None = None
         self._events_file = None
@@ -282,13 +283,31 @@ class ParkingApp(ParkingHooks):
     # ------------------------------------------------------------ 基座约定
 
     def configure(self, options: dict, device_id: str) -> None:
+        try:
+            self._configure(options, device_id)
+        except Exception:
+            self.close()
+            raise
+
+    def _configure(self, options: dict, device_id: str) -> None:
         opts = effective_options(parse_app_options(options), "state")
         _check_id(device_id, "device_id")
         self.events_out = opts.get("events_out") or None
         if self.events_out:
             Path(self.events_out).parent.mkdir(parents=True, exist_ok=True)
             self._events_file = open(self.events_out, "a", encoding="utf-8")
-        super().configure(opts, device_id)   # 建 tx（_make_default_tx）、启定时线程
+        if opts.get("plate") is not None:
+            self.options, self.device_id = opts, device_id
+            self.state_dir = Path(opts.get("state_dir", "state"))
+            self.preview_frame_stride = opts.get("preview_frame_stride", 1)
+            if self.tx is None:
+                self.tx = self._make_default_tx()
+            from .plate.hooks_plate import PlateHooks
+            self.plate_hooks = PlateHooks()
+            self.plate_hooks.tx = self.tx
+            self.plate_hooks.configure(opts, device_id)
+        else:
+            super().configure(opts, device_id)
         from .http_app import ParkingHttp    # 惰性：tests 可只测 config
         self.http = ParkingHttp(self)
         self.http.start()
@@ -296,6 +315,9 @@ class ParkingApp(ParkingHooks):
                  device_id, self.http.port, self.events_out)
 
     def close(self) -> None:
+        if self.plate_hooks is not None:
+            self.plate_hooks.close()
+            self.plate_hooks = None
         if self.http is not None:
             self.http.stop()
             self.http = None
@@ -310,6 +332,35 @@ class ParkingApp(ParkingHooks):
                 self._events_file = None
 
     # ------------------------------------------------------------ 组装
+
+    def analyzers(self, spec) -> list[dict]:
+        if self.plate_hooks is not None:
+            return self.plate_hooks.analyzers(spec)
+        return super().analyzers(spec)
+
+    def plugins(self) -> list[str]:
+        if self.plate_hooks is not None:
+            return self.plate_hooks.plugins()
+        return super().plugins()
+
+    def on_stream_added(self, ctx) -> None:
+        if self.plate_hooks is not None:
+            self.plate_hooks.on_stream_added(ctx)
+            self._streams[ctx.stream_id] = ctx
+        else:
+            super().on_stream_added(ctx)
+
+    def on_stream_removed(self, ctx) -> None:
+        if self.plate_hooks is not None:
+            self.plate_hooks.on_stream_removed(ctx)
+            self._streams.pop(ctx.stream_id, None)
+        else:
+            super().on_stream_removed(ctx)
+
+    def on_event(self, ctx, ev) -> list:
+        if self.plate_hooks is not None:
+            return self.plate_hooks.on_event(ctx, ev)
+        return super().on_event(ctx, ev)
 
     def health(self) -> dict:
         """§S13 B2：优先用 SpoolPublisher.health()（真字段），无则退回钩子版。"""
@@ -334,7 +385,11 @@ class ParkingApp(ParkingHooks):
             max_events=int(spool_opts["max_events"]),
         )
         tx._q = _TappingQueue(self)   # events_out + /events tap（start 前替换）
-        tx.start()
+        try:
+            tx.start()
+        except Exception:
+            tx.close()
+            raise
         return tx
 
     def _tap_event(self, item) -> None:
