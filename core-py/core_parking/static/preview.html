@@ -33,7 +33,12 @@
   const canvas = document.getElementById("overlay");
   const ctx2d = canvas.getContext("2d");
 
+  // 最近一次 preview.json：图片晚于 json 到达时 load 事件用它重画，而不是清空叠加层。
+  let lastJs = null;
+  let frameUrl = null;
+
   function drawBoxes(js) {
+    if (js) lastJs = js; else js = lastJs;
     canvas.width = img.naturalWidth || 640;
     canvas.height = img.naturalHeight || 360;
     ctx2d.clearRect(0, 0, canvas.width, canvas.height);
@@ -59,8 +64,28 @@
     }
   }
 
+  // /preview.jpg 每路限 1 次/秒（http_app._PREVIEW_MIN_INTERVAL_S），超限返回 429 JSON。
+  // 先 fetch 再换图：非 200 时保留上一帧，<img> 不会显示破图。
+  async function refreshFrame() {
+    try {
+      const r = await fetch("/preview.jpg" + q + (q ? "&" : "?") + "t=" + Date.now(),
+                            { cache: "no-store" });
+      if (!r.ok) return;
+      const url = URL.createObjectURL(await r.blob());
+      const prev = frameUrl;
+      frameUrl = url;
+      img.src = url;
+      if (prev) URL.revokeObjectURL(prev);
+    } catch (e) {
+      // 网络错误：保留上一帧，状态栏由 preview.json 分支报告
+    }
+  }
+
+  let busy = false;
   async function tick() {
-    img.src = "/preview.jpg" + q + (q ? "&" : "?") + "t=" + Date.now();
+    if (busy) return;
+    busy = true;
+    refreshFrame();
     try {
       const r = await fetch("/preview.json" + q, { cache: "no-store" });
       if (r.ok) {
@@ -79,11 +104,14 @@
       }
     } catch (e) {
       document.getElementById("status").textContent = "error: " + e;
+    } finally {
+      busy = false;
     }
   }
-  img.addEventListener("load", () => drawBoxes(null));
+  img.addEventListener("load", () => drawBoxes(null));   // 用 lastJs 重画
   tick();
-  setInterval(tick, 1000);
+  // 略大于服务端 1 s 限流间隔，避免节拍抖动时周期性撞上 429
+  setInterval(tick, 1100);
 </script>
 </body>
 </html>
