@@ -44,6 +44,40 @@ def _mk_event(ts: int, direction: str, seq: int) -> dict:
     }
 
 
+def _mk_plate(ts: int = 1790000001000, seq: int = 0,
+              event_id: str = "00000000-0000-4000-8000-000000000001") -> dict:
+    return {
+        "schema": "parking.plate/1", "event_id": event_id,
+        "site_id": "demo-lot", "camera_id": "gate-a", "ts": ts,
+        "seq": seq, "replayed": False, "plate": "京A12345",
+        "plate_normalized": "京A12345", "region": "cn",
+        "plate_type": "cn_blue", "confidence": 0.99, "votes": 3,
+        "frames": 5, "bbox": [0.1, 0.2, 0.8, 0.6], "track_id": 1,
+        "snapshot": None,
+    }
+
+
+def _mk_gate(plate_event_id: str) -> dict:
+    return {
+        "schema": "parking.gate/1", "event_id": "00000000-0000-4000-8000-000000000002",
+        "site_id": "demo-lot", "camera_id": "gate-a", "ts": 1790000001100,
+        "seq": 1, "replayed": False, "action": "open_pulse",
+        "trigger": "whitelist", "plate_event_id": plate_event_id,
+        "plate_normalized": "京A12345", "whitelist_label": "staff",
+        "pulse_ms": 300, "latency_ms": 100,
+    }
+
+
+def _mk_slots() -> dict:
+    return {
+        "schema": "parking.slots/1", "event_id": "00000000-0000-4000-8000-000000000003",
+        "site_id": "demo-lot", "camera_id": "gate-a", "ts": 1790000001200,
+        "seq": 2, "replayed": False, "changed": ["A1"],
+        "slots": [{"id": "A1", "state": "free", "since": 1790000001200, "cover": 0.1}],
+        "occupied": 0, "free": 1, "unknown": 0, "stream_ok": True,
+    }
+
+
 # ---------------------------------------------------------------- compare_events
 
 def test_compare_events_self_compare_passes():
@@ -261,3 +295,94 @@ def test_accept_platform_missing_app_warns_but_passes(tmp_path):
     assert r.returncode == 0, r.stdout
     report = json.loads((tmp_path / "accept.json").read_text())
     assert any("B2" in w for w in report["warnings"])
+
+
+def test_accept_platform_valid_plate_gate_slots_are_counted_and_validated(tmp_path):
+    plate = _mk_plate()
+    dump = _mk_dump()
+    dump.extend([
+        {"topic": "demo-lot/parking/gate-a/plate", "payload": plate},
+        {"topic": "demo-lot/parking/gate-a/gate", "payload": _mk_gate(plate["event_id"])},
+        {"topic": "demo-lot/parking/gate-a/slots", "payload": _mk_slots()},
+    ])
+    r = _accept(tmp_path, _mk_healthz(18.5), dump)
+    assert r.returncode == 0, r.stdout
+    report = json.loads((tmp_path / "accept.json").read_text())
+    by_kind = report["mqtt_dump"]["by_kind"]
+    assert by_kind["plate"] == {"count": 1, "invalid": 0}
+    assert by_kind["gate"] == {"count": 1, "invalid": 0}
+    assert by_kind["slots"] == {"count": 1, "invalid": 0}
+
+
+def test_accept_platform_declared_kind_invalid_payload_fails_and_counts(tmp_path):
+    dump = _mk_dump()
+    dump.append({"topic": "demo-lot/parking/gate-a/plate",
+                 "payload": {**_mk_plate(), "schema": "parking.plate/2"}})
+    r = _accept(tmp_path, _mk_healthz(18.5), dump)
+    assert r.returncode == 1
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["mqtt_dump"]["by_kind"]["plate"] == {"count": 1, "invalid": 1}
+    assert "plate 校验失败" in r.stdout
+
+
+def test_accept_platform_status_only_has_no_plate_count(tmp_path):
+    status_only = [_mk_dump()[0]]
+    r = _accept(tmp_path, _mk_healthz(18.5), status_only)
+    assert r.returncode == 0, r.stdout
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert "plate" not in report["mqtt_dump"]["by_kind"]
+    assert report["mqtt_dump"]["by_kind"]["status"]["count"] == 1
+
+
+def test_accept_platform_duplicate_plate_event_ids_are_message_counts_only(tmp_path):
+    plate = _mk_plate()
+    dump = _mk_dump() + [
+        {"topic": "demo-lot/parking/gate-a/plate", "payload": plate},
+        {"topic": "demo-lot/parking/gate-a/plate", "payload": plate},
+    ]
+    r = _accept(tmp_path, _mk_healthz(18.5), dump)
+    assert r.returncode == 0, r.stdout
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["mqtt_dump"]["by_kind"]["plate"] == {"count": 2, "invalid": 0}
+    assert "independent" not in report["mqtt_dump"]
+
+
+@pytest.mark.parametrize("record", [[], 1, None])
+def test_accept_platform_nonobject_json_records_fail_with_structured_report(tmp_path, record):
+    r = _accept(tmp_path, _mk_healthz(18.5), [record])
+    assert r.returncode == 1
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["passed"] is False
+    assert report["mqtt_dump"]["invalid"] == 1
+    assert any("dump:1" in problem and "不是 object" in problem
+               for problem in report["problems"])
+
+
+def test_accept_platform_unknown_kind_is_invalid_even_with_warning(tmp_path):
+    dump = _mk_dump() + [{"topic": "demo-lot/parking/gate-a/typo_kind", "payload": {}}]
+    r = _accept(tmp_path, _mk_healthz(18.5), dump)
+    assert r.returncode == 1
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["passed"] is False
+    assert report["mqtt_dump"]["by_kind"]["typo_kind"] == {"count": 1, "invalid": 1}
+    assert any("typo_kind" in warning for warning in report["warnings"])
+    assert any("typo_kind" in problem for problem in report["problems"])
+
+
+def test_accept_platform_invalid_record_shape_fails(tmp_path):
+    r = _accept(tmp_path, _mk_healthz(18.5), [
+        {"topic": "demo-lot/parking/gate-a/plate", "payload": []},
+    ])
+    assert r.returncode == 1
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["mqtt_dump"]["invalid"] == 1
+    assert report["mqtt_dump"]["by_kind"]["plate"] == {"count": 1, "invalid": 1}
+    assert any("dump:1: plate 校验失败" in problem for problem in report["problems"])
+
+
+def test_accept_platform_ack_is_explicit_compatibility_exception(tmp_path):
+    dump = _mk_dump() + [{"topic": "demo-lot/parking/gate-a/ack", "payload": {}}]
+    r = _accept(tmp_path, _mk_healthz(18.5), dump)
+    assert r.returncode == 0, r.stdout
+    report = json.loads((tmp_path / "accept.json").read_text())
+    assert report["mqtt_dump"]["by_kind"]["ack"] == {"count": 1, "invalid": 0}
