@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>edge-parking 计数线</title>
+<style>
+  :root { --bg: #15171a; --panel: #1f2226; --line: #30343a; --fg: #eceef1;
+          --dim: #9aa0a6; --ok: #4dff88; --warn: #ffcf4d; --in: #4dd2ff; --out: #ff9d4d; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+         margin: 0; background: var(--bg); color: var(--fg); }
+  header { padding: 10px 16px; display: flex; gap: 16px; align-items: baseline;
+           border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .hint { font-size: 13px; color: var(--dim); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px;
+         padding: 16px; align-items: start; }
+  .stage { position: relative; background: #000; line-height: 0; }
+  .stage img { display: block; width: 100%; height: auto; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+                  cursor: crosshair; touch-action: none; }
+  aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+          padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  aside h2 { font-size: 14px; margin: 0; color: var(--dim); font-weight: 500; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: #262a2f; border-radius: 6px; padding: 10px 12px; }
+  .tile .k { font-size: 13px; color: var(--dim); }
+  .tile .v { font-size: 34px; font-weight: 700; line-height: 1.1;
+             font-variant-numeric: tabular-nums; }
+  .v.in { color: var(--in); } .v.out { color: var(--out); } .v.ok { color: var(--ok); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 6px;
+           border: 1px solid var(--line); background: #2b3036; color: var(--fg); cursor: pointer; }
+  button.primary { background: #2f7d4f; border-color: #3a9a61; }
+  button:disabled { opacity: .5; cursor: default; }
+  input[type=number] { font: inherit; width: 90px; padding: 7px 8px; border-radius: 6px;
+                       border: 1px solid var(--line); background: #111316; color: var(--fg); }
+  .msg { font-size: 13px; color: var(--dim); min-height: 1.2em; }
+  .msg.err { color: #ff6b6b; } .msg.ok { color: var(--ok); }
+  .coords { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>计数线设置 · Counting line</h1>
+  <span class="hint">在画面上拖动画线，或拖动端点调整 · Drag on the frame to draw the line, or drag an endpoint</span>
+</header>
+<main>
+  <div class="stage">
+    <img id="frame" alt="camera frame">
+    <canvas id="overlay"></canvas>
+  </div>
+  <aside>
+    <h2>计数线 · Line</h2>
+    <div class="coords" id="coords">-</div>
+    <div class="row">
+      <button id="swap">交换进出 · Swap in/out</button>
+      <button id="reset">撤销修改 · Revert</button>
+    </div>
+    <div class="row"><button id="save" class="primary" disabled>保存 · Save</button></div>
+    <div class="msg" id="msg"></div>
+    <h2>实时计数 · Live counts</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">今日驶入 In</div><div class="v in" id="in">-</div></div>
+      <div class="tile"><div class="k">今日驶出 Out</div><div class="v out" id="out">-</div></div>
+      <div class="tile"><div class="k">在场 Inside</div><div class="v" id="occ">-</div></div>
+      <div class="tile"><div class="k">空余 Free</div><div class="v ok" id="free">-</div></div>
+    </div>
+    <h2>场内现有车辆数 · Vehicles inside now</h2>
+    <div class="row">
+      <input type="number" id="occInput" min="0" step="1">
+      <button id="occSet">设置 · Set</button>
+    </div>
+    <div class="msg" id="occMsg"></div>
+  </aside>
+</main>
+<script>
+  // 计数线编辑：GET /config/counting 取当前配置，画面上拖出 a→b 两个端点，
+  // 保存时 PUT /config/counting（服务端校验、写 state_dir/app-options.override.json、
+  // 即时重配 line_cross；重启后从 override 恢复）。
+  // 进/出侧与 line_cross 一致：正侧 = (b-a)×(p-a) > 0 的一侧，in_side 取 positive/negative。
+  const params = new URLSearchParams(location.search);
+  const stream = params.get("stream") || "";
+  const q = stream ? ("?stream=" + encodeURIComponent(stream)) : "";
+  const join = (base, extra) => base + (base.includes("?") ? "&" : "?") + extra;
+  const img = document.getElementById("frame");
+  const canvas = document.getElementById("overlay");
+  const c2d = canvas.getContext("2d");
+  const $ = (id) => document.getElementById(id);
+
+  let cfg = null;        // 服务端当前生效的 counting
+  let line = null;       // 编辑中的 {a:[x,y], b:[x,y]}（源归一化）
+  let inSide = "positive";
+  let dirty = false;
+  let boxes = [];
+  let pendingBoxes = null, frameUrl = null;
+
+  function setMsg(el, text, cls) { el.textContent = text; el.className = "msg " + (cls || ""); }
+  function markDirty(v) { dirty = v; $("save").disabled = !v; }
+
+  async function loadConfig() {
+    const r = await fetch("/config/counting", { cache: "no-store" });
+    if (!r.ok) throw new Error("GET /config/counting: HTTP " + r.status);
+    cfg = await r.json();
+    line = { a: [...cfg.line.a], b: [...cfg.line.b] };
+    inSide = cfg.in_side;
+    markDirty(false);
+    draw();
+  }
+
+  function sideOf(p) {   // 与 line_cross.cpp 同式；像素坐标正缩放不改变符号
+    const dx = line.b[0] - line.a[0], dy = line.b[1] - line.a[1];
+    return dx * (p[1] - line.a[1]) - dy * (p[0] - line.a[0]) > 0 ? "positive" : "negative";
+  }
+
+  function tag(text, x, y, color) {
+    const fs = Math.max(16, Math.round(canvas.width / 44));
+    c2d.font = `700 ${fs}px system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif`;
+    const w = c2d.measureText(text).width + fs * 0.9, h = fs * 1.6;
+    const lx = Math.min(Math.max(0, x - w / 2), canvas.width - w);
+    const ly = Math.min(Math.max(0, y - h / 2), canvas.height - h);
+    c2d.fillStyle = "rgba(10, 12, 14, 0.8)";
+    c2d.fillRect(lx, ly, w, h);
+    c2d.fillStyle = color;
+    c2d.textBaseline = "middle";
+    c2d.fillText(text, lx + fs * 0.45, ly + h / 2);
+  }
+
+  function draw() {
+    canvas.width = img.naturalWidth || 1280;
+    canvas.height = img.naturalHeight || 720;
+    const W = canvas.width, H = canvas.height;
+    c2d.clearRect(0, 0, W, H);
+    const lw = Math.max(2, Math.round(W / 480));
+    c2d.strokeStyle = "rgba(77, 255, 136, 0.8)";
+    c2d.lineWidth = lw;
+    for (const d of boxes) {
+      const [x0, y0, x1, y1] = d.box;
+      c2d.strokeRect(x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H);
+    }
+    if (!line) return;
+    const ax = line.a[0] * W, ay = line.a[1] * H, bx = line.b[0] * W, by = line.b[1] * H;
+    c2d.strokeStyle = "#ffcf4d";
+    c2d.lineWidth = lw + 2;
+    c2d.beginPath(); c2d.moveTo(ax, ay); c2d.lineTo(bx, by); c2d.stroke();
+    const r = Math.max(7, Math.round(W / 110));
+    for (const [x, y, t] of [[ax, ay, "A"], [bx, by, "B"]]) {
+      c2d.fillStyle = "#ffcf4d";
+      c2d.beginPath(); c2d.arc(x, y, r, 0, Math.PI * 2); c2d.fill();
+      c2d.fillStyle = "#15171a"; c2d.font = `700 ${r * 1.4}px sans-serif`;
+      c2d.textBaseline = "middle"; c2d.textAlign = "center"; c2d.fillText(t, x, y + 1);
+      c2d.textAlign = "start";
+    }
+    // 法向：正侧方向 = (-dy, dx)
+    const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len, off = Math.max(48, W / 14);
+    const mx = (ax + bx) / 2, my = (ay + by) / 2;
+    const pos = [mx + nx * off, my + ny * off], neg = [mx - nx * off, my - ny * off];
+    const inP = inSide === "positive" ? pos : neg, outP = inSide === "positive" ? neg : pos;
+    // 箭头：出侧 → 进侧
+    c2d.strokeStyle = "#4dd2ff"; c2d.fillStyle = "#4dd2ff"; c2d.lineWidth = lw + 1;
+    const s0 = [mx + (outP[0] - mx) * 0.55, my + (outP[1] - my) * 0.55];
+    const s1 = [mx + (inP[0] - mx) * 0.55, my + (inP[1] - my) * 0.55];
+    c2d.beginPath(); c2d.moveTo(...s0); c2d.lineTo(...s1); c2d.stroke();
+    const ux = (s1[0] - s0[0]), uy = (s1[1] - s0[1]), ul = Math.hypot(ux, uy) || 1;
+    const hs = Math.max(10, W / 90);
+    c2d.beginPath();
+    c2d.moveTo(...s1);
+    c2d.lineTo(s1[0] - ux / ul * hs - uy / ul * hs * 0.6, s1[1] - uy / ul * hs + ux / ul * hs * 0.6);
+    c2d.lineTo(s1[0] - ux / ul * hs + uy / ul * hs * 0.6, s1[1] - uy / ul * hs - ux / ul * hs * 0.6);
+    c2d.closePath(); c2d.fill();
+    tag("进 IN", inP[0], inP[1], "#4dd2ff");
+    tag("出 OUT", outP[0], outP[1], "#ff9d4d");
+    $("coords").textContent =
+      `A (${line.a.map((v) => v.toFixed(3)).join(", ")}) → B (${line.b.map((v) => v.toFixed(3)).join(", ")}) · in_side ${inSide}`;
+  }
+
+  // ---- 拖动：端点附近拖端点，否则从按下点拉一条新线
+  let drag = null;
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  function normPoint(e) {
+    const r = canvas.getBoundingClientRect();
+    return [clamp((e.clientX - r.left) / r.width), clamp((e.clientY - r.top) / r.height)];
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!line) return;
+    const p = normPoint(e), r = canvas.getBoundingClientRect();
+    const near = (q2) => Math.hypot((q2[0] - p[0]) * r.width, (q2[1] - p[1]) * r.height) < 16;
+    if (near(line.a)) drag = "a";
+    else if (near(line.b)) drag = "b";
+    else { line = { a: p, b: p.slice() }; drag = "b"; }
+    canvas.setPointerCapture(e.pointerId);
+    draw();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    line[drag] = normPoint(e);
+    markDirty(true);
+    draw();
+  });
+  canvas.addEventListener("pointerup", () => {
+    if (!drag) return;
+    drag = null;
+    const r = canvas.getBoundingClientRect();
+    if (Math.hypot((line.a[0] - line.b[0]) * r.width, (line.a[1] - line.b[1]) * r.height) < 10) {
+      setMsg($("msg"), "线太短，请重新拖动 · Line too short, drag again", "err");
+      line = { a: [...cfg.line.a], b: [...cfg.line.b] };
+      markDirty(inSide !== cfg.in_side);
+    }
+    draw();
+  });
+
+  $("swap").onclick = () => { inSide = inSide === "positive" ? "negative" : "positive"; markDirty(true); draw(); };
+  $("reset").onclick = () => loadConfig().then(() => setMsg($("msg"), "已恢复为当前生效配置 · Reverted", ""));
+  $("save").onclick = async () => {
+    const body = { ...cfg, line: { a: line.a, b: line.b }, in_side: inSide };
+    $("save").disabled = true;
+    try {
+      const r = await fetch("/config/counting", { method: "PUT", body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" } });
+      const js = await r.json();
+      if (!r.ok) throw new Error(js.error || ("HTTP " + r.status));
+      cfg = js;
+      markDirty(false);
+      setMsg($("msg"), "已保存并生效，重启后保留 · Saved, applied, kept across restarts", "ok");
+    } catch (e) {
+      $("save").disabled = false;
+      setMsg($("msg"), "保存失败 · Save failed: " + (e.message || e), "err");
+    }
+  };
+  $("occSet").onclick = async () => {
+    const n = Number($("occInput").value);
+    if (!Number.isInteger(n) || n < 0) return setMsg($("occMsg"), "请输入 ≥ 0 的整数 · Enter an integer ≥ 0", "err");
+    try {
+      const r = await fetch("/occupancy" + q, { method: "POST", body: JSON.stringify({ occupancy: n }),
+        headers: { "Content-Type": "application/json" } });
+      const js = await r.json();
+      if (!r.ok) throw new Error(js.error || ("HTTP " + r.status));
+      setMsg($("occMsg"), `已设为 ${n} · Set to ${n}`, "ok");
+      refreshCounts();
+    } catch (e) {
+      setMsg($("occMsg"), "设置失败 · Failed: " + (e.message || e), "err");
+    }
+  };
+
+  let occInit = false;
+  async function refreshCounts() {
+    const o = await fetch("/occupancy" + q, { cache: "no-store" });
+    if (!o.ok) return;
+    const js = await o.json();
+    $("in").textContent = js.in_today; $("out").textContent = js.out_today;
+    $("occ").textContent = `${js.occupancy}/${js.capacity}`; $("free").textContent = js.free;
+    if (!occInit) { $("occInput").value = js.occupancy; occInit = true; }
+  }
+
+  // 帧与框同源：先取 /preview.jpg（X-Frame-Seq），再取该帧的 /preview.json?seq=
+  let busy = false;
+  async function tick() {
+    if (busy) return;
+    busy = true;
+    try {
+      const r = await fetch(join("/preview.jpg" + q, "t=" + Date.now()), { cache: "no-store" });
+      if (r.ok) {
+        const blob = await r.blob(), seq = r.headers.get("X-Frame-Seq");
+        const j = await fetch(join("/preview.json" + q, seq != null ? "seq=" + seq : ""), { cache: "no-store" });
+        pendingBoxes = j.ok ? ((await j.json()).detections || []) : [];
+        const url = URL.createObjectURL(blob), prev = frameUrl;
+        frameUrl = url; img.src = url;
+        if (prev) URL.revokeObjectURL(prev);
+      }
+      await refreshCounts();
+    } catch (e) { /* 保留上一帧 */ } finally { busy = false; }
+  }
+  img.addEventListener("load", () => { if (pendingBoxes) { boxes = pendingBoxes; pendingBoxes = null; } draw(); });
+  window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+  loadConfig().catch((e) => setMsg($("msg"), String(e.message || e), "err"));
+  tick();
+  setInterval(tick, 1100);
+</script>
+</body>
+</html>

@@ -89,6 +89,31 @@ class CountingOptions:
         return opt
 
 
+COUNTING_OVERRIDE_NAME = "app-options.override.json"
+
+
+def load_counting_override(state_dir: Path) -> dict | None:
+    """读 ``state_dir/app-options.override.json`` 的 ``counting`` 段（``PUT /config/counting`` 写入）。
+
+    文件不存在返回 None；内容损坏或校验失败记 warning 并返回 None（回落部署时的配置），
+    不让一份坏的 override 把应用卡在启动阶段。
+    """
+    path = Path(state_dir) / COUNTING_OVERRIDE_NAME
+    if not path.is_file():
+        return None
+    try:
+        import json
+        data = json.loads(path.read_text(encoding="utf-8"))
+        counting = data.get("counting") if isinstance(data, dict) else None
+        if not isinstance(counting, dict):
+            return None
+        CountingOptions.from_dict(counting)
+        return counting
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        log.warning("ignoring %s: %s", path, exc)
+        return None
+
+
 def line_cross_config(counting: CountingOptions, classes=CLASS_IDS) -> dict:
     """``app.options.counting`` → 基座 `line_cross` 分析器配置（规格 §6.2 映射表）。
 
@@ -132,6 +157,9 @@ class ParkingHooks:
     def configure(self, options: dict, device_id: str) -> None:
         self.options = dict(options or {})
         self.device_id = device_id
+        override = load_counting_override(Path(self.options.get("state_dir", "state")))
+        if override is not None:
+            self.options["counting"] = override   # PUT /config/counting 的结果跨重启保留
         self.counting = CountingOptions.from_dict(self.options.get("counting", {}))
         self.classes = tuple(int(c) for c in self.options.get("classes", CLASS_IDS))
         self.preview_frame_stride = max(1, int(self.options.get("preview_frame_stride", 1)))

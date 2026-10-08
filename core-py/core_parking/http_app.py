@@ -6,13 +6,14 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/events?limit=50` | 最近事件数组（`config.ParkingApp.recent_events`） |
-| GET | `/preview` | 静态 `static/preview.html`（浏览器画框与计数线） |
-| GET | `/preview.jpg?stream=<id>` | 基座快照 JPEG，同一路 ≤ 1 次/秒 |
-| GET | `/preview.json?stream=<id>` | 最近抽样 FrameResult 框（源归一化）+ 计数线 |
-| GET/PUT | `/config/counting` | counting 段；PUT 校验后写 override 并即时生效 |
+| GET | `/preview` | 静态 `static/preview.html`（浏览器画框、计数线、读牌或车位状态） |
+| GET | `/counting/editor` | 计数线编辑页（`static/counting_editor.html`）：拖线、交换进出、保存走 `PUT /config/counting` |
+| GET | `/preview.jpg?stream=<id>` | 基座快照 JPEG（最近有框的那一帧，`X-Frame-Seq` 头给帧号），同一路 ≤ 1 次/秒 |
+| GET | `/preview.json?stream=<id>` | 最近抽样 FrameResult 框（源归一化，`?seq=` 取指定帧）+ 计数线；slots 预设返回车位状态；车牌预设改为附 `plate` / `recent_reads` |
+| GET/PUT | `/config/counting` | counting 段；PUT 校验后写 `app-options.override.json` 并即时生效，重启时读回 |
 | GET | `/occupancy` | occupancy 快照（余位屏直连） |
 | POST | `/occupancy` | `{"occupancy": int}` → `manual_set` 快照 |
-| GET | `/slots/editor` | NRD-4 车位编辑页（`slots/editor.html`，原生 JS canvas） |
+| GET | `/slots/editor` | NRD-4 车位编辑 + 实时状态页（`slots/editor.html`，原生 JS canvas） |
 | GET | `/snapshot/{stream}.jpg` | 基座快照 JPEG（编辑页背景，同一路 ≤ 1 次/秒） |
 | GET/PUT | `/config/slots` | 车位表；PUT 校验后原子写 `slots.override.json` 并即时重配 |
 
@@ -108,6 +109,8 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._get_events(q)
             if u.path == "/preview":
                 return self._get_preview()
+            if u.path == "/counting/editor":
+                return self._get_counting_editor()
             if u.path == "/preview.jpg":
                 return self._get_preview_jpg(q)
             if u.path == "/preview.json":
@@ -152,6 +155,13 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _get_preview(self) -> None:
         page = (_STATIC_DIR / "preview.html").read_bytes()
+        self._send(200, page, "text/html; charset=utf-8")
+
+    def _get_counting_editor(self) -> None:
+        if getattr(self.app, "plate_hooks", None) is not None or \
+                not callable(getattr(self.app, "set_counting", None)):
+            return self._error(404, "counting not configured on this app")
+        page = (_STATIC_DIR / "counting_editor.html").read_bytes()
         self._send(200, page, "text/html; charset=utf-8")
 
     def _get_preview_jpg(self, q: dict) -> None:
