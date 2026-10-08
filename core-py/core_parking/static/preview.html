@@ -84,7 +84,8 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
     (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const hhmmss = (ms) => ms ? new Date(ms).toLocaleTimeString("zh-CN", { hour12: false }) : "-";
-  const plateColor = (t) => (t && t.includes("new_energy")) || t === "green" ? "green"
+  // plate_type：cn_blue / cn_green（charset.plate_type）
+  const plateColor = (t) => (t && t.includes("green")) ? "green"
                           : (t && t.includes("yellow")) ? "yellow" : "blue";
 
   // 框外标签：深色底 + 文字；优先放在框上方，顶部放不下则放到框下方。
