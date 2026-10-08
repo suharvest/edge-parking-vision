@@ -93,6 +93,15 @@ class SlotsApp(SlotHooks):
     def configure(self, options: dict, device_id: str) -> None:
         opts = dict(options or {})
         opts.setdefault("state_dir", "state")
+        override_path = Path(opts["state_dir"]) / _OVERRIDE_NAME
+        if override_path.is_file():
+            with override_path.open(encoding="utf-8") as f:
+                override = json.load(f)
+            if not isinstance(override, dict):
+                raise ValueError(f"{override_path}: slots override must be an object")
+            merged = dict(opts.get("slots") or {})
+            merged.update(override)
+            opts["slots"] = merged
         super().configure(opts, device_id)
         from ..http_app import ParkingHttp    # 惰性：tests 可只测本类
         self.http = ParkingHttp(self)
@@ -105,10 +114,6 @@ class SlotsApp(SlotHooks):
             self.http.stop()
             self.http = None
         super().close()
-        tx = self.tx
-        close = getattr(tx, "close", None)
-        if callable(close):
-            close()
 
     # ------------------------------------------------------------ HTTP 后端
 
