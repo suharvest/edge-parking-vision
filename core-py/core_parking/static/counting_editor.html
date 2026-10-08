@@ -155,7 +155,7 @@
     }
     // 法向：正侧方向 = (-dy, dx)
     const dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
-    const nx = -dy / len, ny = dx / len, off = Math.max(48, W / 14);
+    const nx = -dy / len, ny = dx / len, off = Math.max(64, W / 9);
     const mx = (ax + bx) / 2, my = (ay + by) / 2;
     const pos = [mx + nx * off, my + ny * off], neg = [mx - nx * off, my - ny * off];
     const inP = inSide === "positive" ? pos : neg, outP = inSide === "positive" ? neg : pos;

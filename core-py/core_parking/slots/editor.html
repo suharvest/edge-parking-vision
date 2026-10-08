@@ -52,9 +52,9 @@ NRD-4 车位编辑 + 实时状态页（GET /slots/editor）。原生 JS + canvas
   ul.bays li.sel { background: #2b3440; }
   ul.bays li input { width: 100%; padding: 4px 6px; background: #111316; }
   ul.bays .dot { width: 10px; height: 10px; border-radius: 50%; background: #888; }
-  .dot.occupied { background: var(--bad); } .dot.free { background: var(--ok); }
+  ul.bays .dot.occupied { background: var(--bad); } ul.bays .dot.free { background: var(--ok); }
   .st { font-size: 13px; color: var(--dim); }
-  ul.bays button { padding: 3px 8px; font-size: 13px; }
+  ul.bays button { padding: 3px 9px; font-size: 13px; }
   .msg { font-size: 13px; color: var(--dim); min-height: 1.2em; white-space: pre-wrap; }
   .msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
   @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
@@ -128,15 +128,24 @@ function nextId() {
   for (let n = slots.length + 1; ; n++) { const id = "P" + String(n).padStart(2, "0"); if (!ids.has(id)) return id; }
 }
 
+let placed = [];          // 本帧已放的标签矩形，避免相邻车位标签互相压住
+function hits(r) { return placed.some((q) => r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h); }
 function label(text, x, yTop, yBottom, color) {
   const fs = Math.max(16, Math.round(cv.width / 50));
   g.font = `600 ${fs}px system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif`;
   const padX = Math.round(fs * 0.45), padY = Math.round(fs * 0.28);
   const w = g.measureText(text).width + padX * 2, h = fs + padY * 2, gap = Math.round(fs * 0.25);
-  let y = yTop - gap - h;
-  if (y < 0) y = yBottom + gap;
-  if (y + h > cv.height) y = Math.max(0, cv.height - h);
   const lx = Math.min(Math.max(0, x - w / 2), cv.width - w);
+  // 候选：多边形上方 → 下方 → 继续向上错开；都放不下时退回上方
+  const cands = [yTop - gap - h, yBottom + gap];
+  for (let k = 1; k <= 6; k++) cands.push(yTop - gap - h - k * (h + 2));
+  let y = null;
+  for (const c of cands) {
+    if (c < 0 || c + h > cv.height) continue;
+    if (!hits({ x: lx, y: c, w, h })) { y = c; break; }
+  }
+  if (y == null) y = Math.min(Math.max(0, yTop - gap - h), cv.height - h);
+  placed.push({ x: lx, y, w, h });
   g.fillStyle = "rgba(10, 12, 14, 0.78)"; g.fillRect(lx, y, w, h);
   g.fillStyle = color; g.textBaseline = "top"; g.fillText(text, lx + padX, y + padY);
 }
@@ -145,6 +154,7 @@ function draw() {
   cv.width = img.naturalWidth || 1280; cv.height = img.naturalHeight || 720;
   const W = cv.width, H = cv.height, lw = Math.max(2, Math.round(W / 480));
   g.clearRect(0, 0, W, H);
+  placed = [];
   slots.forEach((s, i) => {
     const pts = s.polygon.map(([x, y]) => [x * W, y * H]);
     const st = (states[s.id] || {}).state || "unknown";
@@ -185,7 +195,7 @@ function renderPanel() {
     const li = document.createElement("li");
     if (i === sel) li.className = "sel";
     li.innerHTML = `<span class="dot ${st}"></span><input aria-label="bay id"><span class="st">${
-      st === "occupied" ? "占用 Occupied" : st === "free" ? "空闲 Free" : "未知 Unknown"}</span><button>删除 · Delete</button>`;
+      st === "occupied" ? "占用" : st === "free" ? "空闲" : "未知"}</span><button title="删除 · Delete" aria-label="删除 · Delete">✕</button>`;
     const inp = li.querySelector("input");
     inp.value = s.id;
     inp.onfocus = () => { sel = i; draw(); };
