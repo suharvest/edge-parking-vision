@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import types
 import urllib.error
 import urllib.request
@@ -220,3 +221,111 @@ def test_slots_preview_json_reports_states_and_counts(slots_app):
 def test_slots_preview_jpg_reports_frame_seq(slots_app):
     status, headers, _ = _get(slots_app, "/preview.jpg?stream=cam-b1-01")
     assert status == 200 and headers["X-Frame-Seq"] == "3"
+
+
+# ------------------------------------------- counting override: editor keys only
+
+def _counting_app(tmp_path, capacity=None):
+    opts = _counting_options(tmp_path)
+    if capacity is not None:
+        opts["counting"]["capacity"] = capacity
+    a = ParkingApp()
+    a.tx = RecordingPublisher()
+    a.configure(opts, "dev-1")
+    return a, opts
+
+
+def test_counting_override_stores_only_editor_keys(tmp_path):
+    a, opts = _counting_app(tmp_path)
+    try:
+        body = json.loads(json.dumps(opts["counting"]))
+        body["line"] = {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+        body["capacity"] = opts["counting"]["capacity"] + 50   # 编辑页不改 capacity：忽略
+        applied = a.set_counting(body)
+        assert applied["capacity"] == opts["counting"]["capacity"]
+        assert a.counting.capacity == opts["counting"]["capacity"]
+    finally:
+        a.close()
+    data = json.loads((tmp_path / "app-options.override.json").read_text(encoding="utf-8"))
+    assert set(data["counting"]) == {"line", "in_side"}
+    assert data["counting"]["line"] == {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+
+
+def test_redeploy_capacity_wins_over_saved_line(tmp_path):
+    a, opts = _counting_app(tmp_path)
+    try:
+        body = json.loads(json.dumps(opts["counting"]))
+        body["line"] = {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+        body["in_side"] = "negative"
+        a.set_counting(body)
+    finally:
+        a.close()
+    new_cap = opts["counting"]["capacity"] + 7
+    b, _ = _counting_app(tmp_path, capacity=new_cap)          # 重新部署改总车位数
+    try:
+        assert b.counting.capacity == new_cap
+        assert b.counting.line == {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+        assert b.counting.in_side == "negative"
+        ctx = FakeStreamContext(stream_id="gate-a")
+        b.on_stream_added(ctx)
+        assert ctx.state["occ"].capacity == new_cap
+    finally:
+        b.close()
+
+
+def test_partial_put_keeps_saved_line(tmp_path):
+    a, _ = _counting_app(tmp_path)
+    try:
+        a.set_counting({"line": {"a": [0.2, 0.1], "b": [0.3, 0.9]}})
+        a.set_counting({"in_side": "negative"})
+        assert a.counting.line == {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+        assert a.counting.in_side == "negative"
+    finally:
+        a.close()
+
+
+def test_put_without_editor_keys_rejected(tmp_path):
+    from core_parking.config import ConfigError
+    a, _ = _counting_app(tmp_path)
+    try:
+        with pytest.raises(ConfigError):
+            a.set_counting({"capacity": 99})
+    finally:
+        a.close()
+    assert not (tmp_path / "app-options.override.json").exists()
+
+
+def test_legacy_full_override_ignores_extra_keys_logs_once(tmp_path, caplog):
+    legacy = json.loads(json.dumps(_counting_options(tmp_path)["counting"]))
+    legacy["line"] = {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+    legacy["capacity"] = 3                                    # 旧版本写下的整段 counting
+    (tmp_path / "app-options.override.json").write_text(
+        json.dumps({"counting": legacy}), encoding="utf-8")
+    caplog.set_level(logging.WARNING, logger="core_parking.hooks_counting")
+    for cap in (40, 41):
+        a, _ = _counting_app(tmp_path, capacity=cap)
+        try:
+            assert a.counting.capacity == cap
+            assert a.counting.line == {"a": [0.2, 0.1], "b": [0.3, 0.9]}
+        finally:
+            a.close()
+    msgs = [r.getMessage() for r in caplog.records if "non-editor counting keys" in r.getMessage()]
+    assert len(msgs) == 1 and "capacity" in msgs[0]
+    # 下一次保存把文件收敛成只含 editor 键
+    a, _ = _counting_app(tmp_path, capacity=40)
+    try:
+        a.set_counting({"in_side": "negative"})
+    finally:
+        a.close()
+    data = json.loads((tmp_path / "app-options.override.json").read_text(encoding="utf-8"))
+    assert set(data["counting"]) == {"line", "in_side"}
+
+
+def test_invalid_override_line_falls_back_to_deploy(tmp_path):
+    (tmp_path / "app-options.override.json").write_text(
+        json.dumps({"counting": {"line": {"a": [1.5, 0.1], "b": [0.3, 0.9]}}}), encoding="utf-8")
+    a, opts = _counting_app(tmp_path)
+    try:
+        assert a.counting.line == opts["counting"]["line"]
+    finally:
+        a.close()

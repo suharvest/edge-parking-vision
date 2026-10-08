@@ -27,7 +27,8 @@ log = logging.getLogger(__name__)
 
 _PREVIEW_FRAMES = 64   # 每路保留的最近抽样帧数（/preview.json?seq= 对齐快照）
 
-__all__ = ["CountingOptions", "ParkingHooks", "line_cross_config", "map_direction"]
+__all__ = ["COUNTING_EDITOR_KEYS", "CountingOptions", "ParkingHooks",
+           "line_cross_config", "load_counting_override", "map_direction"]
 
 
 def map_direction(bdir: str, in_side: str) -> str:
@@ -91,12 +92,37 @@ class CountingOptions:
 
 COUNTING_OVERRIDE_NAME = "app-options.override.json"
 
+#: 计数线编辑页（``/counting/editor``）能改的键。override 只保存这些；capacity 等
+#: 其余 counting 键始终以部署配置为准，重新部署改总车位数即时生效。
+COUNTING_EDITOR_KEYS = ("line", "in_side")
+
+_override_extra_logged: set[str] = set()   # 每个 override 文件的多余键只记一次日志
+
+
+def check_counting_editor_fields(fields: dict) -> None:
+    """校验 editor 键（``line`` 端点 0–1、``in_side``）；非法抛 ``ValueError``。"""
+    if "line" in fields:
+        line = fields["line"]
+        if not isinstance(line, dict) or set(line) != {"a", "b"}:
+            raise ValueError(f"counting.line must be {{a, b}}, got {line!r}")
+        for k in ("a", "b"):
+            pt = line[k]
+            if (not isinstance(pt, list) or len(pt) != 2
+                    or any(isinstance(v, bool) or not isinstance(v, (int, float))
+                           or v < 0 or v > 1 for v in pt)):
+                raise ValueError(f"counting.line.{k} must be [x, y] in 0..1, got {pt!r}")
+    if "in_side" in fields and fields["in_side"] not in ("positive", "negative"):
+        raise ValueError(f"counting.in_side must be 'positive' or 'negative', "
+                         f"got {fields['in_side']!r}")
+
 
 def load_counting_override(state_dir: Path) -> dict | None:
     """读 ``state_dir/app-options.override.json`` 的 ``counting`` 段（``PUT /config/counting`` 写入）。
 
-    文件不存在返回 None；内容损坏或校验失败记 warning 并返回 None（回落部署时的配置），
-    不让一份坏的 override 把应用卡在启动阶段。
+    只返回 editor 键（`COUNTING_EDITOR_KEYS`）；旧版本写下的整段 counting
+    （含 capacity 等）中其余键被忽略，每个文件记一次 warning——这些键以部署配置为准。
+    文件不存在或没有 editor 键返回 None；内容损坏或校验失败记 warning 并返回 None
+    （回落部署时的配置），不让一份坏的 override 把应用卡在启动阶段。
     """
     path = Path(state_dir) / COUNTING_OVERRIDE_NAME
     if not path.is_file():
@@ -107,8 +133,16 @@ def load_counting_override(state_dir: Path) -> dict | None:
         counting = data.get("counting") if isinstance(data, dict) else None
         if not isinstance(counting, dict):
             return None
-        CountingOptions.from_dict(counting)
-        return counting
+        extra = sorted(set(counting) - set(COUNTING_EDITOR_KEYS))
+        if extra and str(path) not in _override_extra_logged:
+            _override_extra_logged.add(str(path))
+            log.warning("%s: ignoring non-editor counting keys %s "
+                        "(deploy config is authoritative for them)", path, extra)
+        picked = {k: counting[k] for k in COUNTING_EDITOR_KEYS if k in counting}
+        if not picked:
+            return None
+        check_counting_editor_fields(picked)
+        return picked
     except (OSError, ValueError, TypeError, KeyError) as exc:
         log.warning("ignoring %s: %s", path, exc)
         return None
@@ -142,6 +176,7 @@ class ParkingHooks:
         self.options: dict = {}
         self.device_id = ""
         self.counting = CountingOptions()
+        self.deploy_counting: dict = {}
         self.classes: tuple[int, ...] = CLASS_IDS
         self.preview_frame_stride = 1
         self.state_dir = Path("state")
@@ -157,9 +192,12 @@ class ParkingHooks:
     def configure(self, options: dict, device_id: str) -> None:
         self.options = dict(options or {})
         self.device_id = device_id
+        # 部署配置的 counting 段原样留底；override 只叠加 editor 键（线端点、进出侧），
+        # 所以重新部署改 capacity 等键会生效，而编辑页画的线跨重启保留。
+        self.deploy_counting = dict(self.options.get("counting") or {})
         override = load_counting_override(Path(self.options.get("state_dir", "state")))
         if override is not None:
-            self.options["counting"] = override   # PUT /config/counting 的结果跨重启保留
+            self.options["counting"] = {**self.deploy_counting, **override}
         self.counting = CountingOptions.from_dict(self.options.get("counting", {}))
         self.classes = tuple(int(c) for c in self.options.get("classes", CLASS_IDS))
         self.preview_frame_stride = max(1, int(self.options.get("preview_frame_stride", 1)))

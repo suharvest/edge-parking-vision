@@ -352,11 +352,33 @@ class ParkingApp(ParkingHooks):
     def set_counting(self, counting: dict) -> dict:
         """``PUT /config/counting`` 后端：校验 → 写 override → 即时生效（§S4）。
 
+        只采纳编辑页可改的键（``line`` / ``in_side``，见
+        `hooks_counting.COUNTING_EDITOR_KEYS`），叠加到部署配置上；body 里其余
+        counting 键（编辑页 GET 后原样回传的 capacity 等）不生效也不落盘，未知键仍 400。
+        override 文件只写 editor 键，所以重新部署改总车位数不会被旧 override 盖住。
+
         返回生效的 counting dict；校验失败抛 `ConfigError`（HTTP 层转 400），
         ``configure_analyzer`` 失败抛 `vision_base.hooks.ConfigureError`
         （HTTP 层转 503）。
         """
-        new = validate_counting(counting)
+        from .hooks_counting import COUNTING_EDITOR_KEYS
+        if not isinstance(counting, dict):
+            _err("counting", "必须为对象")
+        allowed = {"line", "in_side", "count_directions", "capacity",
+                   *_COUNTING_NUM_KEYS, *_COUNTING_INT_KEYS}
+        _check_keys(counting, allowed, "counting")
+        edits = {k: counting[k] for k in COUNTING_EDITOR_KEYS if k in counting}
+        if not edits:
+            _err("counting", f"至少需要 {list(COUNTING_EDITOR_KEYS)} 之一")
+        current = dict(self.options.get("counting") or self.deploy_counting)
+        base = {**self.deploy_counting,
+                **{k: current[k] for k in COUNTING_EDITOR_KEYS if k in current}}
+        new = validate_counting({**base, **edits})
+        ignored = sorted(k for k in counting
+                         if k not in COUNTING_EDITOR_KEYS and counting[k] != base.get(k))
+        if ignored:
+            log.info("PUT /config/counting: ignoring non-editor keys %s "
+                     "(deploy config is authoritative)", ignored)
         override_path = Path(self.options.get("state_dir", "state")) \
             / "app-options.override.json"
         override_path.parent.mkdir(parents=True, exist_ok=True)
@@ -366,13 +388,16 @@ class ParkingApp(ParkingHooks):
                 merged = json.loads(override_path.read_text(encoding="utf-8"))
             except ValueError:
                 merged = {}
-        merged["counting"] = new
+            if not isinstance(merged, dict):
+                merged = {}
+        merged["counting"] = {k: new[k] for k in COUNTING_EDITOR_KEYS}
         tmp = str(override_path) + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(merged, f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, override_path)
+        self.options["counting"] = new
 
         from .hooks_counting import CountingOptions, line_cross_config
         self.counting = CountingOptions.from_dict(new)
