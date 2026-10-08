@@ -1,7 +1,7 @@
 # Thin app-layer overlay on the published nrd-parking-rk image.
 # Context is prepared by tools/build_overlay_images.sh; only core_parking files
 # listed there are replaced, everything else (runtime, vision_base, models) is inherited.
-ARG BASE_IMAGE=sensecraft-missionpack.seeed.cn/solution/nrd-parking-rk:20261008@sha256:df4bb508037d6d3fc95b03a74914b578b8252be92701c18a996d31bfcb79efbb
+ARG BASE_IMAGE=sensecraft-missionpack.seeed.cn/solution/nrd-parking-rk:20261009@sha256:af0e3d258ab9cb838f6c87c869586918f70500726df0623ab225e65cb0f39ff8
 FROM ${BASE_IMAGE}
 ARG SRC_COMMIT=unknown
 COPY core_parking/ /opt/edge-parking/core_parking/
