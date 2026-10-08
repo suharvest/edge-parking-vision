@@ -35,6 +35,8 @@ log = logging.getLogger("core_parking.http_app")
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 _PREVIEW_MIN_INTERVAL_S = 1.0    # 同一路 /preview.jpg ≤ 1 次/秒（§S4）
+_PREVIEW_MAX_SIDE = 1280         # /preview.jpg 长边像素（runtime 默认 640，截图放大后发糊）
+_RECENT_READS = 5                # /preview.json recent_reads 条数（车牌预设）
 
 # 端口 → 存活的服务器。§S2 runtime.workers=1 时分片在未fork线程内运行，
 # 分片崩溃重启会重新 load_app：新 ParkingApp 必须复用已在监听的服务器
@@ -61,11 +63,14 @@ class _Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):  # 安静些：业务日志走 logging
         log.debug("%s - %s", self.address_string(), fmt % args)
 
-    def _send(self, code: int, body: bytes, ctype: str) -> None:
+    def _send(self, code: int, body: bytes, ctype: str,
+              headers: dict | None = None) -> None:
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        for k, v in (headers or {}).items():
+            self.send_header(k, str(v))
         self.end_headers()
         try:
             self.wfile.write(body)
@@ -161,10 +166,19 @@ class _Handler(BaseHTTPRequestHandler):
         last = getattr(self.server, "_jpg_last", None) or {}
         if now - last.get(sid, 0.0) < _PREVIEW_MIN_INTERVAL_S:
             return self._error(429, "rate limit: 1 req/s per stream")
-        _meta, jpeg = ctx.request_snapshot(seq=0, track_id=0, crop=False)
+        # 取最近一次保存框的那一帧（runtime 环形缓冲按 seq 查找，找不到回落最新帧），
+        # 回包 X-Frame-Seq 为实际帧号，页面据此取 /preview.json?seq= 的框，框与帧对齐。
+        res = ctx.state.get("last")
+        want = int(res.seq) if res is not None else 0
+        meta, jpeg = ctx.request_snapshot(seq=want, track_id=0, crop=False,
+                                          max_side=_PREVIEW_MAX_SIDE)
         last[sid] = now
         self.server._jpg_last = last
-        self._send(200, bytes(jpeg), "image/jpeg")
+        headers = {}
+        used = (meta or {}).get("seq") if isinstance(meta, dict) else None
+        if isinstance(used, int) and not isinstance(used, bool):
+            headers["X-Frame-Seq"] = used
+        self._send(200, bytes(jpeg), "image/jpeg", headers)
 
     # -------------------------------------------------------------- slots（NRD-4 P3）
 
@@ -206,11 +220,32 @@ class _Handler(BaseHTTPRequestHandler):
         if picked is None:
             return self._error(404, "no stream")
         ctx, sid = picked
+        if callable(getattr(self.app, "get_slots_config", None)):
+            return self._json(self._slots_preview(ctx, sid))
         res = ctx.state.get("last")
+        want = (q.get("seq") or [None])[0]
+        if want is not None:
+            try:
+                want_seq = int(want)
+            except ValueError:
+                return self._error(400, "seq must be an integer")
+            for r in reversed(list(ctx.state.get("frames") or ())):
+                if r.seq == want_seq:
+                    res = r
+                    break
+        plate_preset = getattr(self.app, "plate_hooks", None) is not None
         out = {"schema": "parking.preview/1", "stream_id": sid,
-               "line": {"a": list(self.app.counting.line["a"]),
-                        "b": list(self.app.counting.line["b"])},
-               "detections": []}
+               "preset": "counting", "detections": []}
+        if plate_preset:
+            # 车牌预设没有计数线；附最近读牌结果，供页面在框旁标注
+            reads_by_track, recent = self._plate_reads(sid)
+            out["preset"] = "plate"
+            out["line"] = None
+            out["recent_reads"] = recent
+        else:
+            reads_by_track = {}
+            out["line"] = {"a": list(self.app.counting.line["a"]),
+                           "b": list(self.app.counting.line["b"])}
         if res is not None:
             out["seq"] = res.seq
             out["ts_ms"] = int(round(res.wall_ms))
@@ -227,8 +262,58 @@ class _Handler(BaseHTTPRequestHandler):
                             round(_clip01(scx + sw / 2), 6),
                             round(_clip01(scy + sh / 2), 6)],
                 })
+                read = reads_by_track.get(d.track_id)
+                if read is not None:
+                    dets[-1]["plate"] = read
             out["detections"] = dets
         self._json(out)
+
+    def _plate_reads(self, sid: str) -> tuple[dict, list]:
+        """从 /events 环形缓冲取本路的 ``parking.plate/1`` 事件。
+
+        返回 (track_id → 该轨迹最新一次读牌, 最近 _RECENT_READS 次读牌，新→旧)。
+        读牌经 dedup 后才发布，因此同一车牌在 dedup_s 内只出现一次。
+        """
+        by_track: dict = {}
+        recent: list = []
+        for env in reversed(list(getattr(self.app, "recent_events", ()))):
+            if (not isinstance(env, dict) or env.get("schema") != "parking.plate/1"
+                    or env.get("camera_id") != sid):
+                continue
+            read = {"ts_ms": env.get("ts"), "plate": env.get("plate"),
+                    "plate_type": env.get("plate_type"),
+                    "confidence": env.get("confidence")}
+            if len(recent) < _RECENT_READS:
+                recent.append(read)
+            tid = env.get("track_id")
+            if isinstance(tid, int) and tid not in by_track:
+                by_track[tid] = read
+        return by_track, recent
+
+    def _slots_preview(self, ctx, sid: str) -> dict:
+        """slots 预设：每个车位的多边形（源归一化）+ 当前状态与计数。"""
+        polys = {s["id"]: s["polygon"]
+                 for s in (self.app.get_slots_config().get(sid) or [])}
+        lock = getattr(self.app, "_streams_lock", None)
+        if lock is not None:
+            with lock:
+                states = {k: dict(v) for k, v in (ctx.state.get("slots") or {}).items()}
+        else:
+            states = {k: dict(v) for k, v in (ctx.state.get("slots") or {}).items()}
+        slots, counts = [], {"occupied": 0, "free": 0, "unknown": 0}
+        for slot_id, poly in polys.items():
+            st = states.get(slot_id) or {}
+            state = st.get("state", "unknown")
+            if state not in counts:
+                state = "unknown"
+            counts[state] += 1
+            slots.append({"id": slot_id, "polygon": poly, "state": state,
+                          "since_ms": st.get("since"),
+                          "cover": round(float(st.get("cover") or 0.0), 4)})
+        return {"schema": "parking.preview/1", "stream_id": sid,
+                "preset": "slots", "line": None, "detections": [],
+                "slots": slots, "counts": counts}
+
 
     def _counting_dict(self) -> dict:
         c = self.app.counting

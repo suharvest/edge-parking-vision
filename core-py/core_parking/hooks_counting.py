@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,6 +24,8 @@ from .classes import CLASS_IDS, vehicle_class
 from .occupancy import Occupancy, SeqAllocator
 
 log = logging.getLogger(__name__)
+
+_PREVIEW_FRAMES = 64   # 每路保留的最近抽样帧数（/preview.json?seq= 对齐快照）
 
 __all__ = ["CountingOptions", "ParkingHooks", "line_cross_config", "map_direction"]
 
@@ -200,6 +203,10 @@ class ParkingHooks:
     def on_frame(self, ctx, res) -> list:
         if res.seq % self.preview_frame_stride == 0:
             ctx.state["last"] = res  # 只保存引用，不做计算
+            frames = ctx.state.get("frames")
+            if frames is None:
+                frames = ctx.state["frames"] = deque(maxlen=_PREVIEW_FRAMES)
+            frames.append(res)       # /preview.json?seq= 按快照帧号回查框
         return []
 
     def health(self) -> dict:  # §S13 B2：基座放入 /healthz 的 app 子对象

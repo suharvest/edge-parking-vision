@@ -2,120 +2,243 @@
 <html lang="zh">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>edge-parking 预览</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 0; background: #17191c; color: #e8e8e8; }
-  header { padding: 8px 16px; display: flex; gap: 24px; align-items: baseline; }
-  header h1 { font-size: 16px; margin: 0; }
-  header span { font-size: 13px; color: #9aa0a6; }
-  main { position: relative; display: inline-block; margin: 0 16px 16px; }
-  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  #status { font-size: 12px; color: #8ab4f8; }
+  :root { --bg: #15171a; --panel: #1f2226; --line: #30343a; --fg: #eceef1;
+          --dim: #9aa0a6; --ok: #4dff88; --warn: #ffcf4d; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+         margin: 0; background: var(--bg); color: var(--fg); }
+  header { padding: 10px 16px; display: flex; gap: 16px; align-items: baseline;
+           border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  #status { font-size: 12px; color: var(--dim); margin-left: auto;
+            font-variant-numeric: tabular-nums; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px;
+         padding: 16px; align-items: start; }
+  .stage { position: relative; background: #000; line-height: 0; }
+  .stage img { display: block; width: 100%; height: auto; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+          padding: 16px; }
+  aside h2 { font-size: 14px; margin: 0 0 12px; color: var(--dim); font-weight: 500; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: #262a2f; border-radius: 6px; padding: 10px 12px; }
+  .tile .k { font-size: 13px; color: var(--dim); }
+  .tile .v { font-size: 40px; font-weight: 700; line-height: 1.1;
+             font-variant-numeric: tabular-nums; }
+  .tile.wide { grid-column: 1 / -1; }
+  .v.ok { color: var(--ok); } .v.bad { color: var(--bad); } .v.warn { color: var(--warn); }
+  ul.reads { list-style: none; margin: 0; padding: 0; }
+  ul.reads li { display: grid; grid-template-columns: 6px 1fr auto; gap: 10px;
+                align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  ul.reads li:last-child { border-bottom: 0; }
+  .chip { width: 6px; align-self: stretch; border-radius: 3px; background: #2f6bff; }
+  .chip.green { background: #3ccf6e; } .chip.yellow { background: #f2c230; }
+  .plate { font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+  .meta { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .conf { font-size: 20px; font-weight: 600; color: var(--ok);
+          font-variant-numeric: tabular-nums; }
+  .empty { color: var(--dim); font-size: 14px; }
+  .bays { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .bay { font-size: 13px; padding: 3px 8px; border-radius: 4px; background: #33373d; }
+  .bay.occupied { background: rgba(230, 70, 70, .35); }
+  .bay.free { background: rgba(60, 200, 110, .30); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>edge-parking 安装取景</h1>
-  <span id="occ">occupancy –</span>
+  <h1 id="title">edge-parking 预览</h1>
   <span id="status">loading…</span>
 </header>
 <main>
-  <img id="frame" alt="preview">
-  <canvas id="overlay"></canvas>
+  <div class="stage">
+    <img id="frame" alt="preview">
+    <canvas id="overlay"></canvas>
+  </div>
+  <aside id="panel"><p class="empty">等待数据…</p></aside>
 </main>
 <script>
-  // §S4 /preview：每秒拉 /preview.jpg 与 /preview.json，在 canvas 上画框与计数线。
+  // §S4 /preview（及 /slots/view）：每秒先取 /preview.jpg（回包 X-Frame-Seq 为帧号），
+  // 再取同一帧的 /preview.json?seq=，图片解码后用这一份 json 画叠加层，框与车辆对齐。
   // 服务端不画图（Python 不碰像素）；stream 参数可透传，如 ?stream=gate-a。
   const params = new URLSearchParams(location.search);
   const stream = params.get("stream") || "";
   const q = stream ? ("?stream=" + encodeURIComponent(stream)) : "";
+  const join = (base, extra) => base + (base.includes("?") ? "&" : "?") + extra;
   const img = document.getElementById("frame");
   const canvas = document.getElementById("overlay");
   const ctx2d = canvas.getContext("2d");
+  const panel = document.getElementById("panel");
+  const TITLES = { counting: "出入口计数 · Entry/Exit Counting",
+                   plate: "车牌识别 · Plate Recognition",
+                   slots: "车位占用 · Bay Occupancy" };
 
-  // 最近一次 preview.json：图片晚于 json 到达时 load 事件用它重画，而不是清空叠加层。
-  let lastJs = null;
-  // /occupancy 只在计数预设存在；收到 404 后不再轮询。
+  let frameJs = null;    // 与当前 <img> 同一帧的 json
+  let pendingJs = null;  // 新图片解码完成后生效
   let occAvailable = true;
   let frameUrl = null;
 
-  function drawBoxes(js) {
-    if (js) lastJs = js; else js = lastJs;
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const hhmmss = (ms) => ms ? new Date(ms).toLocaleTimeString("zh-CN", { hour12: false }) : "-";
+  const plateColor = (t) => (t && t.includes("new_energy")) || t === "green" ? "green"
+                          : (t && t.includes("yellow")) ? "yellow" : "blue";
+
+  // 框外标签：深色底 + 文字；优先放在框上方，顶部放不下则放到框下方。
+  function label(text, x, yTop, yBottom, color, bar) {
+    const fs = Math.max(16, Math.round(canvas.width / 46));
+    ctx2d.font = `600 ${fs}px system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif`;
+    const padX = Math.round(fs * 0.45), padY = Math.round(fs * 0.3);
+    const barW = bar ? Math.round(fs * 0.3) : 0;
+    const w = ctx2d.measureText(text).width + padX * 2 + barW;
+    const h = fs + padY * 2;
+    const gap = Math.max(3, Math.round(fs * 0.2));
+    let y = yTop - gap - h;
+    if (y < 0) y = yBottom + gap;
+    if (y + h > canvas.height) y = Math.max(0, canvas.height - h);
+    const lx = Math.min(Math.max(0, x), canvas.width - w);
+    ctx2d.fillStyle = "rgba(10, 12, 14, 0.78)";
+    ctx2d.fillRect(lx, y, w, h);
+    if (bar) { ctx2d.fillStyle = bar; ctx2d.fillRect(lx, y, barW, h); }
+    ctx2d.fillStyle = color;
+    ctx2d.textBaseline = "top";
+    ctx2d.fillText(text, lx + barW + padX, y + padY);
+  }
+
+  function draw(js) {
     canvas.width = img.naturalWidth || 640;
     canvas.height = img.naturalHeight || 360;
     ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-    if (!js || !js.detections) return;
-    ctx2d.strokeStyle = "#4dff88";
-    ctx2d.lineWidth = 2;
-    ctx2d.font = "12px sans-serif";
-    for (const d of js.detections) {
-      const [x0, y0, x1, y1] = d.box;
-      ctx2d.strokeRect(x0 * canvas.width, y0 * canvas.height,
-                       (x1 - x0) * canvas.width, (y1 - y0) * canvas.height);
-      ctx2d.fillStyle = "#4dff88";
-      ctx2d.fillText(`#${d.track_id} ${d.score.toFixed(2)}`,
-                     x0 * canvas.width + 3, y0 * canvas.height + 13);
+    if (!js) return;
+    const W = canvas.width, H = canvas.height;
+    const lw = Math.max(2, Math.round(W / 480));
+    if (js.preset === "slots") {
+      for (const s of js.slots || []) {
+        const pts = s.polygon.map(([x, y]) => [x * W, y * H]);
+        if (pts.length < 3) continue;
+        const fill = s.state === "occupied" ? "rgba(230, 60, 60, 0.38)"
+                   : s.state === "free" ? "rgba(60, 205, 110, 0.32)" : "rgba(150, 150, 150, 0.30)";
+        const stroke = s.state === "occupied" ? "#ff5a5a"
+                     : s.state === "free" ? "#4dff88" : "#b0b0b0";
+        ctx2d.beginPath();
+        pts.forEach(([x, y], i) => (i ? ctx2d.lineTo(x, y) : ctx2d.moveTo(x, y)));
+        ctx2d.closePath();
+        ctx2d.fillStyle = fill; ctx2d.fill();
+        ctx2d.strokeStyle = stroke; ctx2d.lineWidth = lw; ctx2d.stroke();
+        const ys = pts.map((p) => p[1]), xs = pts.map((p) => p[0]);
+        const top = Math.min(...ys), bottom = Math.max(...ys);
+        const word = s.state === "occupied" ? "占用" : s.state === "free" ? "空闲" : "未知";
+        label(`${s.id} ${word}`, Math.min(...xs), top, bottom, stroke);
+      }
+      return;
     }
-    if (js.line) {
+    if (js.line && js.preset !== "plate") {
       ctx2d.strokeStyle = "#ffcf4d";
-      ctx2d.lineWidth = 3;
+      ctx2d.lineWidth = lw + 1;
       ctx2d.beginPath();
-      ctx2d.moveTo(js.line.a[0] * canvas.width, js.line.a[1] * canvas.height);
-      ctx2d.lineTo(js.line.b[0] * canvas.width, js.line.b[1] * canvas.height);
+      ctx2d.moveTo(js.line.a[0] * W, js.line.a[1] * H);
+      ctx2d.lineTo(js.line.b[0] * W, js.line.b[1] * H);
       ctx2d.stroke();
+    }
+    for (const d of js.detections || []) {
+      const [x0, y0, x1, y1] = d.box;
+      ctx2d.strokeStyle = "#4dff88";
+      ctx2d.lineWidth = lw;
+      ctx2d.strokeRect(x0 * W, y0 * H, (x1 - x0) * W, (y1 - y0) * H);
+      if (js.preset === "plate") {
+        if (d.plate && d.plate.plate) {
+          const c = plateColor(d.plate.plate_type);
+          const bar = c === "green" ? "#3ccf6e" : c === "yellow" ? "#f2c230" : "#2f6bff";
+          label(`${d.plate.plate}  ${Number(d.plate.confidence).toFixed(2)}`,
+                x0 * W, y0 * H, y1 * H, "#ffffff", bar);
+        }
+      } else {
+        label(`#${d.track_id} ${d.score.toFixed(2)}`, x0 * W, y0 * H, y1 * H, "#4dff88");
+      }
     }
   }
 
-  // /preview.jpg 每路限 1 次/秒（http_app._PREVIEW_MIN_INTERVAL_S），超限返回 429 JSON。
-  // 先 fetch 再换图：非 200 时保留上一帧，<img> 不会显示破图。
-  async function refreshFrame() {
-    try {
-      const r = await fetch("/preview.jpg" + q + (q ? "&" : "?") + "t=" + Date.now(),
-                            { cache: "no-store" });
-      if (!r.ok) return;
-      const url = URL.createObjectURL(await r.blob());
-      const prev = frameUrl;
-      frameUrl = url;
-      img.src = url;
-      if (prev) URL.revokeObjectURL(prev);
-    } catch (e) {
-      // 网络错误：保留上一帧，状态栏由 preview.json 分支报告
+  function renderPanel(js, occ) {
+    if (!js) return;
+    document.getElementById("title").textContent = TITLES[js.preset] || "edge-parking 预览";
+    if (js.preset === "plate") {
+      const reads = js.recent_reads || [];
+      panel.innerHTML = `<h2>最近识别 · Recent reads</h2>` + (reads.length
+        ? `<ul class="reads">` + reads.map((r) => `<li><span class="chip ${plateColor(r.plate_type)}"></span>
+             <div><div class="plate">${esc(r.plate)}</div><div class="meta">${hhmmss(r.ts_ms)}</div></div>
+             <span class="conf">${Number(r.confidence).toFixed(2)}</span></li>`).join("") + `</ul>`
+        : `<p class="empty">暂无读牌</p>`);
+    } else if (js.preset === "slots") {
+      const c = js.counts || {};
+      const total = (c.occupied || 0) + (c.free || 0) + (c.unknown || 0);
+      panel.innerHTML = `<h2>车位状态 · Bays</h2><div class="tiles">
+          <div class="tile"><div class="k">占用 Occupied</div><div class="v bad">${c.occupied ?? 0}</div></div>
+          <div class="tile"><div class="k">空闲 Free</div><div class="v ok">${c.free ?? 0}</div></div>
+          <div class="tile wide"><div class="k">车位总数 Total${c.unknown ? ` · 未知 ${c.unknown}` : ""}</div>
+            <div class="v">${total}</div></div></div>
+        <div class="bays">` + (js.slots || []).map((s) =>
+          `<span class="bay ${esc(s.state)}">${esc(s.id)}</span>`).join("") + `</div>`;
+    } else if (occ) {
+      panel.innerHTML = `<h2>场内统计 · Lot status</h2><div class="tiles">
+          <div class="tile wide"><div class="k">在场 Occupancy</div>
+            <div class="v">${occ.occupancy}<span class="meta"> / ${occ.capacity}</span></div></div>
+          <div class="tile wide"><div class="k">空余 Free</div><div class="v ok">${occ.free}</div></div>
+          <div class="tile"><div class="k">今日驶入 In</div><div class="v warn">${occ.in_today}</div></div>
+          <div class="tile"><div class="k">今日驶出 Out</div><div class="v warn">${occ.out_today}</div></div>
+        </div>`;
+    } else if (!occAvailable) {
+      panel.innerHTML = `<p class="empty">occupancy n/a（当前预设无计数模块）</p>`;
     }
+  }
+
+  async function fetchJson(seq) {
+    const r = await fetch(join("/preview.json" + q, seq != null ? "seq=" + seq : "") , { cache: "no-store" });
+    if (!r.ok) throw new Error("preview.json: HTTP " + r.status);
+    return r.json();
   }
 
   let busy = false;
   async function tick() {
     if (busy) return;
     busy = true;
-    refreshFrame();
     try {
-      const r = await fetch("/preview.json" + q, { cache: "no-store" });
-      if (r.ok) {
-        const js = await r.json();
-        drawBoxes(js);
-        document.getElementById("status").textContent =
-          `seq ${js.seq ?? "-"} · ${js.detections?.length ?? 0} det · ${js.inference_ms ?? "-"} ms`;
-      } else {
-        document.getElementById("status").textContent = "preview.json: HTTP " + r.status;
+      // /preview.jpg 每路限 1 次/秒；非 200 时保留上一帧与它的叠加层，只刷新侧栏。
+      let blob = null, seq = null;
+      try {
+        const r = await fetch(join("/preview.jpg" + q, "t=" + Date.now()), { cache: "no-store" });
+        if (r.ok) { blob = await r.blob(); seq = r.headers.get("X-Frame-Seq"); }
+      } catch (e) { /* 网络错误：保留上一帧 */ }
+      const js = await fetchJson(blob ? seq : null);
+      if (blob) {
+        pendingJs = js;
+        const url = URL.createObjectURL(blob);
+        const prev = frameUrl;
+        frameUrl = url;
+        img.src = url;
+        if (prev) URL.revokeObjectURL(prev);
       }
-      if (occAvailable) {
+      let occ = null;
+      if (js.preset === "counting" && occAvailable) {
         const o = await fetch("/occupancy" + q, { cache: "no-store" });
-        if (o.ok) {
-          const js = await o.json();
-          document.getElementById("occ").textContent =
-            `occupancy ${js.occupancy}/${js.capacity} · free ${js.free} · in_today ${js.in_today} · out_today ${js.out_today}`;
-        } else if (o.status === 404) {
-          occAvailable = false;
-          document.getElementById("occ").textContent = "occupancy n/a（当前预设无计数模块）";
-        }
+        if (o.ok) occ = await o.json(); else if (o.status === 404) occAvailable = false;
       }
+      renderPanel(js, occ);
+      const synced = blob && seq != null && String(js.seq) === String(seq);
+      document.getElementById("status").textContent =
+        `seq ${js.seq ?? "-"}${synced ? " · frame-synced" : ""} · ${js.detections?.length ?? 0} det · ${js.inference_ms ?? "-"} ms`;
     } catch (e) {
-      document.getElementById("status").textContent = "error: " + e;
+      document.getElementById("status").textContent = String(e.message || e);
     } finally {
       busy = false;
     }
   }
-  img.addEventListener("load", () => drawBoxes(null));   // 用 lastJs 重画
+  img.addEventListener("load", () => {
+    if (pendingJs) { frameJs = pendingJs; pendingJs = null; }
+    draw(frameJs);
+  });
   tick();
   // 略大于服务端 1 s 限流间隔，避免节拍抖动时周期性撞上 429
   setInterval(tick, 1100);
