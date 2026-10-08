@@ -109,7 +109,9 @@ function drawPoly(poly, color, close) {
   poly.forEach((p, i) => { const [x, y] = toPx(p); i ? g.lineTo(x, y) : g.moveTo(x, y); });
   if (close) g.closePath();
   g.strokeStyle = color; g.lineWidth = 2; g.stroke();
-  if (close) { g.fillStyle = color + "33"; g.fill(); }
+  // 半透明填充用 globalAlpha：color + "33" 对 3 位 hex（"#0f6"）会拼出非法的 "#0f633"，
+  // fillStyle 赋值被忽略，沿用上一次的不透明颜色并盖住车位里的车。
+  if (close) { g.save(); g.globalAlpha = 0.2; g.fillStyle = color; g.fill(); g.restore(); }
   poly.forEach(p => { const [x, y] = toPx(p); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fillStyle = color; g.fill(); });
 }
 
