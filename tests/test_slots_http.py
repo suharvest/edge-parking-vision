@@ -101,7 +101,7 @@ def test_editor_page_served(app):
     with urllib.request.urlopen(_base(app) + "/slots/editor", timeout=5) as r:
         body = r.read().decode()
     assert r.status == 200
-    assert "<canvas" in body and "/snapshot/" in body
+    assert "<canvas" in body and "/preview.jpg" in body and "/preview.json" in body
     assert "/config/slots" in body
     assert "<script" in body and "src=" not in body.split("<script")[1].split(">")[0]
 

@@ -1,190 +1,121 @@
 <!DOCTYPE html>
 <!--
-NRD-4 P3 车位编辑页（规格 §5.1/§5.3、§8.1 P3 行）。
-
-原生 JS + canvas，无框架无构建（§S1 标准库约定）：
-- 背景取 ``GET /snapshot/{stream}.jpg``（基座快照，最新一帧）；
-- 点击画面加顶点画多边形、拖动顶点调整、选中/删除/重命名车位；
-- 保存前客户端校验（≥3 顶点、id 唯一、凸多边形），``PUT /config/slots``
-  全量提交（服务端再校验一次并写 slots.override.json、即时生效）。
+NRD-4 车位编辑 + 实时状态页（GET /slots/editor）。原生 JS + canvas，无框架无构建。
+- 背景为实时画面：每秒取 /preview.jpg?stream=（X-Frame-Seq）与同一帧的 /preview.json?seq=，
+  后者在 slots 预设下给出每个车位的当前状态（occupied / free / unknown）；
+- 在空白处拖出矩形新建车位，再拖 4 个角贴合透视；也可「逐点画」点 4 个角；
+- 车位 id 在右侧列表内直接改，逐个删除；
+- 保存：客户端校验（≥3 顶点、凸、id 唯一）后 PUT /config/slots（只提交当前流），
+  服务端再校验、原子写 state_dir/slots.override.json、即时重配；重启后 SlotsApp.configure
+  读回 override。
 坐标一律 0–1 源归一化，与 slots.schema.json / slot_coverage 配置一致。
 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>车位编辑 · edge-parking-slots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>edge-parking 车位</title>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 12px; background: #1b1e23; color: #ddd; }
-  h1 { font-size: 18px; margin: 0 0 8px; }
-  #bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
-  button, select, input { background: #2a2f36; color: #ddd; border: 1px solid #555; border-radius: 4px; padding: 4px 8px; }
-  button:disabled { opacity: .4; }
-  #msg { min-height: 1.2em; color: #8f8; white-space: pre-wrap; }
-  #msg.err { color: #f88; }
-  #wrap { position: relative; display: inline-block; border: 1px solid #444; }
-  canvas { display: block; max-width: 100%; cursor: crosshair; }
-  #list { margin-top: 8px; border-collapse: collapse; }
-  #list td, #list th { border: 1px solid #444; padding: 2px 8px; font-size: 13px; }
-  #list tr.sel { background: #345; }
-  .hint { color: #999; font-size: 12px; }
+  :root { --bg: #15171a; --panel: #1f2226; --line: #30343a; --fg: #eceef1;
+          --dim: #9aa0a6; --ok: #4dff88; --bad: #ff6b6b; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif;
+         margin: 0; background: var(--bg); color: var(--fg); }
+  header { padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+           border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; }
+  header .hint { font-size: 13px; color: var(--dim); }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px;
+         padding: 16px; align-items: start; }
+  .stage { position: relative; background: #000; line-height: 0; }
+  .stage img { display: block; width: 100%; height: auto; min-height: 200px; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%;
+                  cursor: crosshair; touch-action: none; }
+  aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+          padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  aside h2 { font-size: 14px; margin: 0; color: var(--dim); font-weight: 500; }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { background: #262a2f; border-radius: 6px; padding: 10px 12px; }
+  .tile .k { font-size: 13px; color: var(--dim); }
+  .tile .v { font-size: 38px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .v.ok { color: var(--ok); } .v.bad { color: var(--bad); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button, select, input { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 6px;
+           border: 1px solid var(--line); background: #2b3036; color: var(--fg); }
+  button { cursor: pointer; }
+  button.primary { background: #2f7d4f; border-color: #3a9a61; }
+  button.active { border-color: #ffcf4d; color: #ffcf4d; }
+  button:disabled { opacity: .5; cursor: default; }
+  ul.bays { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow: auto; }
+  ul.bays li { display: grid; grid-template-columns: 10px 1fr auto auto; gap: 8px; align-items: center;
+               padding: 6px 4px; border-bottom: 1px solid var(--line); border-radius: 4px; }
+  ul.bays li.sel { background: #2b3440; }
+  ul.bays li input { width: 100%; padding: 4px 6px; background: #111316; }
+  ul.bays .dot { width: 10px; height: 10px; border-radius: 50%; background: #888; }
+  .dot.occupied { background: var(--bad); } .dot.free { background: var(--ok); }
+  .st { font-size: 13px; color: var(--dim); }
+  ul.bays button { padding: 3px 8px; font-size: 13px; }
+  .msg { font-size: 13px; color: var(--dim); min-height: 1.2em; white-space: pre-wrap; }
+  .msg.err { color: var(--bad); } .msg.ok { color: var(--ok); }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
-<h1>车位编辑（NRD-4 slots）</h1>
-<div id="bar">
-  <label>流 <select id="stream"></select></label>
-  <button id="reload">刷新快照</button>
-  <button id="add">新车位</button>
-  <button id="close" disabled>闭合多边形</button>
-  <button id="undo" disabled>撤销顶点</button>
-  <button id="del" disabled>删除选中</button>
-  <label>id <input id="slotid" size="10" placeholder="B1-023"></label>
-  <button id="rename" disabled>重命名选中</button>
-  <button id="save">保存（PUT /config/slots）</button>
-</div>
-<div class="hint">操作：点击画面加顶点；「闭合多边形」或点击首顶点附近结束；拖动顶点微调；点击多边形内部选中。坐标为 0–1 归一化。</div>
-<div id="msg"></div>
-<div id="wrap"><canvas id="cv" width="960" height="540"></canvas></div>
-<table id="list"><thead><tr><th>id</th><th>顶点数</th></tr></thead><tbody></tbody></table>
-
+<header>
+  <h1>车位占用 · Parking bays</h1>
+  <label class="row">摄像头 Camera <select id="stream"></select></label>
+  <span class="hint" id="hint">空白处拖动画矩形新建车位，拖动角点贴合车位 · Drag on an empty area to add a bay, drag its corners to fit</span>
+</header>
+<main>
+  <div class="stage">
+    <img id="frame" alt="camera frame">
+    <canvas id="cv"></canvas>
+  </div>
+  <aside>
+    <h2>实时状态 · Live status</h2>
+    <div class="tiles">
+      <div class="tile"><div class="k">占用 Occupied</div><div class="v bad" id="nOcc">-</div></div>
+      <div class="tile"><div class="k">空闲 Free</div><div class="v ok" id="nFree">-</div></div>
+    </div>
+    <h2>车位 · Bays</h2>
+    <ul class="bays" id="list"></ul>
+    <div class="row">
+      <button id="clickMode">逐点画 · Click corners</button>
+      <button id="revert">撤销修改 · Revert</button>
+    </div>
+    <div class="row"><button id="save" class="primary" disabled>保存 · Save</button></div>
+    <div class="msg" id="msg"></div>
+  </aside>
+</main>
 <script>
 "use strict";
-const cv = document.getElementById("cv"), g = cv.getContext("2d");
-const $ = id => document.getElementById(id);
-const msg = (t, err) => { $("msg").textContent = t; $("msg").className = err ? "err" : ""; };
-
+const $ = (id) => document.getElementById(id);
+const img = $("frame"), cv = $("cv"), g = cv.getContext("2d");
 let streamId = null;
-let slots = [];            // 当前流的 [{id, polygon:[[x,y]..]}]，归一化
-let allSlots = {};         // 全部流的映射（PUT 全量提交）
-let sel = -1;              // 选中车位下标
-let drawing = null;        // 正在画的 [[x,y],...]
-let img = null;            // 背景快照
-let drag = null;           // {slot, idx}
+let saved = {};          // GET /config/slots：{stream: [{id, polygon}]}
+let slots = [];          // 当前流编辑中的车位
+let states = {};         // id → {state, cover}（来自 /preview.json）
+let sel = -1, dirty = false;
+let clickPts = null;     // 逐点画模式下已点的角
+let drag = null;         // {kind: "new"|"corner"|"move", ...}
+let pendingStates = null, frameUrl = null;
 
-// ---------------------------------------------------------------- 数据
-async function loadConfig() {
-  const r = await fetch("/config/slots");
-  if (!r.ok) throw new Error("GET /config/slots -> " + r.status + " " + (await r.text()));
-  allSlots = await r.json();
-  const selBox = $("stream");
-  selBox.innerHTML = "";
-  const ids = Object.keys(allSlots);
-  const q = new URLSearchParams(location.search).get("stream");
-  for (const id of ids) {
-    const o = document.createElement("option");
-    o.value = o.textContent = id;
-    selBox.appendChild(o);
+const msg = (t, cls) => { $("msg").textContent = t; $("msg").className = "msg " + (cls || ""); };
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const sq = () => "?stream=" + encodeURIComponent(streamId);
+function markDirty(v) { dirty = v; $("save").disabled = !v; }
+
+function isConvex(poly) {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length], [cx, cy] = poly[(i + 2) % poly.length];
+    const z = (bx - ax) * (cy - by) - (by - ay) * (cx - bx);
+    if (Math.abs(z) < 1e-9) return false;
+    if (sign === 0) sign = Math.sign(z); else if (Math.sign(z) !== sign) return false;
   }
-  if (!ids.length) { msg("当前没有运行中的流（GET /config/slots 为空）", true); return; }
-  streamId = q && ids.includes(q) ? q : ids[0];
-  selBox.value = streamId;
-  loadStream();
+  return true;
 }
-
-function loadStream() {
-  slots = JSON.parse(JSON.stringify(allSlots[streamId] || []));
-  sel = -1; drawing = null;
-  refreshSnapshot();
-  renderList();
-}
-
-async function refreshSnapshot() {
-  msg("加载快照 /snapshot/" + streamId + ".jpg …");
-  const im = new Image();
-  im.onload = () => { img = im; cv.width = im.naturalWidth; cv.height = im.naturalHeight; draw(); msg(""); };
-  im.onerror = () => { img = null; draw(); msg("快照加载失败（流可能未运行）", true); };
-  im.src = "/snapshot/" + encodeURIComponent(streamId) + ".jpg?t=" + Date.now();
-}
-
-// ---------------------------------------------------------------- 绘制
-function toPx(p) { return [p[0] * cv.width, p[1] * cv.height]; }
-function toNorm(x, y) {
-  const r = cv.getBoundingClientRect();
-  return [Math.min(1, Math.max(0, (x - r.left) * cv.width / r.width)),
-          Math.min(1, Math.max(0, (y - r.top) * cv.height / r.height))];
-}
-
-function drawPoly(poly, color, close) {
-  g.beginPath();
-  poly.forEach((p, i) => { const [x, y] = toPx(p); i ? g.lineTo(x, y) : g.moveTo(x, y); });
-  if (close) g.closePath();
-  g.strokeStyle = color; g.lineWidth = 2; g.stroke();
-  // 半透明填充用 globalAlpha：color + "33" 对 3 位 hex（"#0f6"）会拼出非法的 "#0f633"，
-  // fillStyle 赋值被忽略，沿用上一次的不透明颜色并盖住车位里的车。
-  if (close) { g.save(); g.globalAlpha = 0.2; g.fillStyle = color; g.fill(); g.restore(); }
-  poly.forEach(p => { const [x, y] = toPx(p); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fillStyle = color; g.fill(); });
-}
-
-function draw() {
-  g.clearRect(0, 0, cv.width, cv.height);
-  if (img) g.drawImage(img, 0, 0, cv.width, cv.height);
-  else { g.fillStyle = "#111"; g.fillRect(0, 0, cv.width, cv.height); }
-  slots.forEach((s, i) => drawPoly(s.polygon, i === sel ? "#ff0" : "#0f6", true));
-  if (drawing) drawPoly(drawing, "#f80", false);
-  if (sel >= 0 && slots[sel]) {
-    const [x, y] = toPx(slots[sel].polygon[0]);
-    g.fillStyle = "#ff0"; g.font = "16px sans-serif"; g.fillText(slots[sel].id, x + 6, y - 6);
-  }
-}
-
-function renderList() {
-  const tb = document.querySelector("#list tbody");
-  tb.innerHTML = "";
-  slots.forEach((s, i) => {
-    const tr = document.createElement("tr");
-    if (i === sel) tr.className = "sel";
-    tr.innerHTML = "<td></td><td>" + s.polygon.length + "</td>";
-    tr.firstChild.textContent = s.id;
-    tr.onclick = () => { sel = i; renderList(); draw(); syncButtons(); };
-    tb.appendChild(tr);
-  });
-  syncButtons();
-}
-
-function syncButtons() {
-  $("close").disabled = !drawing || drawing.length < 3;
-  $("undo").disabled = !drawing || !drawing.length;
-  $("del").disabled = sel < 0;
-  $("rename").disabled = sel < 0 || !$("slotid").value.trim();
-}
-
-// ---------------------------------------------------------------- 交互
-cv.addEventListener("mousedown", ev => {
-  const p = toNorm(ev.clientX, ev.clientY);
-  if (drawing) {  // 画线模式：点首顶点附近 = 闭合
-    if (drawing.length >= 3) {
-      const [x0, y0] = toPx(drawing[0]);
-      const r = cv.getBoundingClientRect();
-      const dx = (ev.clientX - r.left) * cv.width / r.width - x0;
-      const dy = (ev.clientY - r.top) * cv.height / r.height - y0;
-      if (dx * dx + dy * dy < 144) return closePolygon();
-    }
-    drawing.push(p); draw(); syncButtons(); return;
-  }
-  // 命中顶点则拖动，否则尝试选中多边形
-  for (let i = slots.length - 1; i >= 0; i--) {
-    for (let j = 0; j < slots[i].polygon.length; j++) {
-      const [x, y] = toPx(slots[i].polygon[j]);
-      const r = cv.getBoundingClientRect();
-      const dx = (ev.clientX - r.left) * cv.width / r.width - x;
-      const dy = (ev.clientY - r.top) * cv.height / r.height - y;
-      if (dx * dx + dy * dy < 100) { sel = i; drag = { slot: i, idx: j }; renderList(); draw(); return; }
-    }
-  }
-  for (let i = slots.length - 1; i >= 0; i--) {
-    if (inPoly(p, slots[i].polygon)) { sel = i; renderList(); draw(); return; }
-  }
-  sel = -1; renderList(); draw();
-});
-cv.addEventListener("mousemove", ev => {
-  if (!drag) return;
-  slots[drag.slot].polygon[drag.idx] = toNorm(ev.clientX, ev.clientY);
-  draw();
-});
-addEventListener("mouseup", () => { drag = null; });
-cv.addEventListener("dblclick", () => { if (drawing && drawing.length >= 3) closePolygon(); });
-
-function inPoly(p, poly) {  // 射线法（编辑页交互用，与服务端凸性校验无关）
+function inside(poly, p) {
   let c = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, yi] = poly[i], [xj, yj] = poly[j];
@@ -192,68 +123,220 @@ function inPoly(p, poly) {  // 射线法（编辑页交互用，与服务端凸�
   }
   return c;
 }
+function nextId() {
+  const ids = new Set(slots.map((s) => s.id));
+  for (let n = slots.length + 1; ; n++) { const id = "P" + String(n).padStart(2, "0"); if (!ids.has(id)) return id; }
+}
 
-function isConvex(poly) {  // 与 hooks_slots.is_convex 同口径：叉积不变号、非退化
-  let sign = 0;
-  for (let i = 0; i < poly.length; i++) {
-    const [x1, y1] = poly[i], [x2, y2] = poly[(i + 1) % poly.length], [x3, y3] = poly[(i + 2) % poly.length];
-    const cr = (x2 - x1) * (y3 - y2) - (y2 - y1) * (x3 - x2);
-    if (Math.abs(cr) < 1e-12) continue;
-    const s = cr > 0 ? 1 : -1;
-    if (sign && s !== sign) return false;
-    sign = s;
+function label(text, x, yTop, yBottom, color) {
+  const fs = Math.max(16, Math.round(cv.width / 50));
+  g.font = `600 ${fs}px system-ui, "PingFang SC", "Noto Sans CJK SC", sans-serif`;
+  const padX = Math.round(fs * 0.45), padY = Math.round(fs * 0.28);
+  const w = g.measureText(text).width + padX * 2, h = fs + padY * 2, gap = Math.round(fs * 0.25);
+  let y = yTop - gap - h;
+  if (y < 0) y = yBottom + gap;
+  if (y + h > cv.height) y = Math.max(0, cv.height - h);
+  const lx = Math.min(Math.max(0, x - w / 2), cv.width - w);
+  g.fillStyle = "rgba(10, 12, 14, 0.78)"; g.fillRect(lx, y, w, h);
+  g.fillStyle = color; g.textBaseline = "top"; g.fillText(text, lx + padX, y + padY);
+}
+
+function draw() {
+  cv.width = img.naturalWidth || 1280; cv.height = img.naturalHeight || 720;
+  const W = cv.width, H = cv.height, lw = Math.max(2, Math.round(W / 480));
+  g.clearRect(0, 0, W, H);
+  slots.forEach((s, i) => {
+    const pts = s.polygon.map(([x, y]) => [x * W, y * H]);
+    const st = (states[s.id] || {}).state || "unknown";
+    const fill = st === "occupied" ? "rgba(230, 60, 60, 0.38)" : st === "free" ? "rgba(60, 205, 110, 0.32)" : "rgba(150, 150, 150, 0.30)";
+    const stroke = st === "occupied" ? "#ff5a5a" : st === "free" ? "#4dff88" : "#b8b8b8";
+    g.beginPath(); pts.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath();
+    g.fillStyle = fill; g.fill();
+    g.strokeStyle = i === sel ? "#ffcf4d" : stroke; g.lineWidth = i === sel ? lw + 1 : lw; g.stroke();
+    const ys = pts.map((p) => p[1]), xs = pts.map((p) => p[0]);
+    const word = st === "occupied" ? "占用" : st === "free" ? "空闲" : "未知";
+    label(`${s.id} ${word}`, (Math.min(...xs) + Math.max(...xs)) / 2, Math.min(...ys), Math.max(...ys), stroke);
+    if (i === sel) {
+      const r = Math.max(6, Math.round(W / 140));
+      for (const [x, y] of pts) {
+        g.fillStyle = "#ffcf4d"; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#15171a"; g.lineWidth = 2; g.stroke();
+      }
+    }
+  });
+  if (clickPts && clickPts.length) {
+    g.strokeStyle = "#ffcf4d"; g.lineWidth = lw; g.setLineDash([8, 6]);
+    g.beginPath(); clickPts.forEach(([x, y], k) => (k ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke();
+    g.setLineDash([]);
+    for (const [x, y] of clickPts) { g.fillStyle = "#ffcf4d"; g.beginPath(); g.arc(x * W, y * H, 6, 0, Math.PI * 2); g.fill(); }
   }
-  return sign !== 0;
+  renderPanel();
 }
 
-// ---------------------------------------------------------------- 按钮
-$("stream").onchange = () => { streamId = $("stream").value; loadStream(); };
-$("reload").onclick = refreshSnapshot;
-$("add").onclick = () => { drawing = []; sel = -1; renderList(); draw(); msg("画车位：点击画面加顶点，≥3 个后「闭合多边形」"); };
-$("undo").onclick = () => { drawing.pop(); draw(); syncButtons(); };
-$("del").onclick = () => { slots.splice(sel, 1); sel = -1; renderList(); draw(); };
-$("rename").onclick = () => {
-  slots[sel].id = $("slotid").value.trim();
-  renderList(); draw();
+function renderPanel() {
+  let occ = 0, free = 0;
+  for (const s of slots) { const st = (states[s.id] || {}).state; if (st === "occupied") occ++; else if (st === "free") free++; }
+  $("nOcc").textContent = occ; $("nFree").textContent = free;
+  const list = $("list");
+  if (document.activeElement && list.contains(document.activeElement)) return;  // 正在改 id 时不重建
+  list.innerHTML = "";
+  slots.forEach((s, i) => {
+    const st = (states[s.id] || {}).state || "unknown";
+    const li = document.createElement("li");
+    if (i === sel) li.className = "sel";
+    li.innerHTML = `<span class="dot ${st}"></span><input aria-label="bay id"><span class="st">${
+      st === "occupied" ? "占用 Occupied" : st === "free" ? "空闲 Free" : "未知 Unknown"}</span><button>删除 · Delete</button>`;
+    const inp = li.querySelector("input");
+    inp.value = s.id;
+    inp.onfocus = () => { sel = i; draw(); };
+    inp.onchange = () => { s.id = inp.value.trim(); markDirty(true); inp.blur(); draw(); };
+    li.querySelector("button").onclick = () => { slots.splice(i, 1); sel = -1; markDirty(true); draw(); };
+    li.onclick = (e) => { if (e.target.tagName !== "BUTTON" && e.target.tagName !== "INPUT") { sel = i; draw(); } };
+    list.appendChild(li);
+  });
+  if (!slots.length) list.innerHTML = `<li><span></span><span class="st">尚无车位 · No bays yet</span></li>`;
+}
+
+// ---- 鼠标交互
+const clamp = (v) => Math.min(1, Math.max(0, v));
+function normPt(e) { const r = cv.getBoundingClientRect(); return [clamp((e.clientX - r.left) / r.width), clamp((e.clientY - r.top) / r.height)]; }
+function pxDist(a, b) { const r = cv.getBoundingClientRect(); return Math.hypot((a[0] - b[0]) * r.width, (a[1] - b[1]) * r.height); }
+
+cv.addEventListener("pointerdown", (e) => {
+  const p = normPt(e);
+  if (clickPts) {
+    if (clickPts.length >= 3 && pxDist(p, clickPts[0]) < 14) return finishClick();
+    clickPts.push(p);
+    if (clickPts.length === 4) return finishClick();
+    return draw();
+  }
+  if (sel >= 0) {
+    const k = slots[sel].polygon.findIndex((q) => pxDist(q, p) < 14);
+    if (k >= 0) { drag = { kind: "corner", k }; cv.setPointerCapture(e.pointerId); return; }
+  }
+  const hit = slots.findIndex((s) => inside(s.polygon, p));
+  if (hit >= 0) {
+    sel = hit; drag = { kind: "move", last: p };
+  } else {
+    sel = -1; drag = { kind: "new", start: p };
+  }
+  cv.setPointerCapture(e.pointerId);
+  draw();
+});
+cv.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  const p = normPt(e);
+  if (drag.kind === "corner") { slots[sel].polygon[drag.k] = p; markDirty(true); }
+  else if (drag.kind === "move") {
+    const dx = p[0] - drag.last[0], dy = p[1] - drag.last[1];
+    if (dx || dy) {
+      slots[sel].polygon = slots[sel].polygon.map(([x, y]) => [clamp(x + dx), clamp(y + dy)]);
+      drag.last = p; markDirty(true);
+    }
+  } else if (drag.kind === "new" && pxDist(p, drag.start) > 10) {
+    const [x0, y0] = drag.start;
+    if (drag.index == null) { slots.push({ id: nextId(), polygon: [] }); drag.index = slots.length - 1; sel = drag.index; }
+    slots[drag.index].polygon = [[x0, y0], [p[0], y0], [p[0], p[1]], [x0, p[1]]];
+    markDirty(true);
+  }
+  draw();
+});
+cv.addEventListener("pointerup", () => {
+  if (drag && drag.kind === "new" && drag.index != null) {
+    const s = slots[drag.index];
+    if (!isConvex(s.polygon)) { slots.splice(drag.index, 1); sel = -1; }
+    else s.polygon = orient(s.polygon);
+  }
+  if (drag && sel >= 0 && slots[sel] && !isConvex(slots[sel].polygon))
+    msg(`车位 ${slots[sel].id} 不是凸四边形，请调整角点 · Bay ${slots[sel].id} is not convex, adjust its corners`, "err");
+  drag = null; draw();
+});
+function orient(poly) {   // 统一为顺时针（图像坐标），角点顺序稳定
+  let a = 0; for (let i = 0; i < poly.length; i++) { const [x0, y0] = poly[i], [x1, y1] = poly[(i + 1) % poly.length]; a += x0 * y1 - x1 * y0; }
+  return a < 0 ? poly.slice().reverse() : poly;
+}
+function finishClick() {
+  const poly = clickPts; clickPts = null; $("clickMode").classList.remove("active");
+  if (poly.length >= 3 && isConvex(poly)) { slots.push({ id: nextId(), polygon: orient(poly) }); sel = slots.length - 1; markDirty(true); }
+  else msg("角点不构成凸多边形，已取消 · Corners do not form a convex polygon, cancelled", "err");
+  draw();
+}
+$("clickMode").onclick = () => {
+  clickPts = clickPts ? null : [];
+  $("clickMode").classList.toggle("active", !!clickPts);
+  msg(clickPts ? "依次点击车位的 4 个角 · Click the 4 corners of the bay" : "");
+  draw();
 };
-$("close").onclick = closePolygon;
-cv.addEventListener("contextmenu", e => e.preventDefault());
-$("slotid").oninput = syncButtons;
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { sel = -1; clickPts = null; $("clickMode").classList.remove("active"); draw(); }
+  if ((e.key === "Delete" || e.key === "Backspace") && sel >= 0 && document.activeElement.tagName !== "INPUT") {
+    slots.splice(sel, 1); sel = -1; markDirty(true); draw();
+  }
+});
 
-function closePolygon() {
-  if (!drawing || drawing.length < 3) return;
-  if (!isConvex(drawing)) { msg("多边形非凸或退化，请调整顶点（撤销重画）", true); return; }
-  let id = $("slotid").value.trim();
-  if (!id) { msg("请先在 id 框输入车位名（如 B1-023）", true); return; }
-  if (slots.some(s => s.id === id)) { msg("id 重复: " + id, true); return; }
-  slots.push({ id, polygon: drawing.map(p => [+p[0].toFixed(6), +p[1].toFixed(6)]) });
-  drawing = null; sel = slots.length - 1; $("slotid").value = "";
-  renderList(); draw(); msg("已加入 " + id + "（未保存）");
+// ---- 配置读写
+async function loadConfig() {
+  const r = await fetch("/config/slots", { cache: "no-store" });
+  if (!r.ok) throw new Error("GET /config/slots: HTTP " + r.status);
+  saved = await r.json();
+  const sel0 = $("stream");
+  if (!sel0.options.length) {
+    for (const sid of Object.keys(saved)) sel0.add(new Option(sid, sid));
+    const want = new URLSearchParams(location.search).get("stream");
+    if (want && saved[want]) sel0.value = want;
+  }
+  streamId = sel0.value || null;
+  slots = clone(saved[streamId] || []);
+  sel = -1; markDirty(false); draw();
 }
-
+$("stream").onchange = () => {
+  if (dirty && !confirm("放弃未保存的修改？ · Discard unsaved changes?")) { $("stream").value = streamId; return; }
+  streamId = $("stream").value; slots = clone(saved[streamId] || []); sel = -1; states = {}; markDirty(false); draw();
+};
+$("revert").onclick = () => { slots = clone(saved[streamId] || []); sel = -1; markDirty(false); msg("已恢复为当前生效配置 · Reverted"); draw(); };
 $("save").onclick = async () => {
-  if (drawing) { msg("有未闭合的多边形，先闭合或撤销", true); return; }
+  const ids = new Set();
   for (const s of slots) {
-    if (s.polygon.length < 3) return msg("车位 " + s.id + " 顶点不足 3 个", true);
-    if (!isConvex(s.polygon)) return msg("车位 " + s.id + " 多边形非凸", true);
+    if (!s.id) return msg("车位 id 不能为空 · Bay id cannot be empty", "err");
+    if (ids.has(s.id)) return msg(`车位 id 重复：${s.id} · Duplicate bay id: ${s.id}`, "err");
+    ids.add(s.id);
+    if (s.polygon.length < 3 || !isConvex(s.polygon)) return msg(`车位 ${s.id} 不是凸多边形 · Bay ${s.id} is not convex`, "err");
   }
-  const ids = slots.map(s => s.id);
-  if (new Set(ids).size !== ids.length) return msg("车位 id 重复", true);
-  allSlots[streamId] = slots;
+  $("save").disabled = true;
   try {
-    const r = await fetch("/config/slots", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(allSlots),
-    });
-    const text = await r.text();
-    if (!r.ok) return msg("保存失败 " + r.status + ": " + text, true);
-    allSlots = JSON.parse(text);
-    msg("已保存并即时生效（" + r.status + "）");
-    renderList(); draw();
-  } catch (e) { msg("保存异常: " + e, true); }
+    const r = await fetch("/config/slots", { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [streamId]: slots }) });
+    const js = await r.json();
+    if (!r.ok) throw new Error(js.error || ("HTTP " + r.status));
+    saved = js; slots = clone(saved[streamId] || []); sel = -1; markDirty(false);
+    msg("已保存并生效，重启后保留 · Saved, applied, kept across restarts", "ok");
+    draw();
+  } catch (e) { $("save").disabled = false; msg("保存失败 · Save failed: " + (e.message || e), "err"); }
 };
 
-loadConfig().catch(e => msg("初始化失败: " + e, true));
+// ---- 实时画面与状态：先 /preview.jpg（X-Frame-Seq），再同一帧的 /preview.json
+let busy = false;
+async function tick() {
+  if (busy || !streamId) return;
+  busy = true;
+  try {
+    const r = await fetch("/preview.jpg" + sq() + "&t=" + Date.now(), { cache: "no-store" });
+    const seq = r.ok ? r.headers.get("X-Frame-Seq") : null;
+    const blob = r.ok ? await r.blob() : null;
+    const j = await fetch("/preview.json" + sq() + (seq != null ? "&seq=" + seq : ""), { cache: "no-store" });
+    const next = {};
+    if (j.ok) for (const s of (await j.json()).slots || []) next[s.id] = { state: s.state, cover: s.cover };
+    if (blob) {
+      pendingStates = next;
+      const url = URL.createObjectURL(blob), prev = frameUrl;
+      frameUrl = url; img.src = url; if (prev) URL.revokeObjectURL(prev);
+    } else { states = next; draw(); }
+  } catch (e) { /* 保留上一帧 */ } finally { busy = false; }
+}
+img.addEventListener("load", () => { if (pendingStates) { states = pendingStates; pendingStates = null; } draw(); });
+window.addEventListener("beforeunload", (e) => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+loadConfig().then(tick).catch((e) => msg(String(e.message || e), "err"));
+setInterval(tick, 1100);
 </script>
 </body>
 </html>
