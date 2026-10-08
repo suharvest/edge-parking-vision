@@ -25,3 +25,8 @@ training/samples/
 # 测试素材（§S6：test 集自拍视频不外发；仅索引入库）
 evaluation/data/private/
 evaluation/runs/*/
+
+# 运行时状态目录（默认 state_dir）与临时导出的 onnx / 训练权重
+state/
+/*.onnx
+models/*.pt
