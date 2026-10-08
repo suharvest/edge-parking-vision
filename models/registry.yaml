@@ -10,7 +10,7 @@ models:
 artifacts:          # 键 = 平台键；各平台转换脚本写入
   cpu:          # C3：CPU 基座直接运行 onnx（docker 平台挂载 ./models:/models:ro）
     vehicle416: {file: yolox_tiny_coco_416.onnx, sha256: "427cc366d34e27ff7a03e2899b5e3671425c262ea2291f88bb942bc1cc70b0f7"}
-    vehicle640: {file: yolox_tiny_coco_640.onnx, sha256: "a885935b0ef432fc864327e3039570500467f568ce9c98b193e70525aa31de9"}
+    vehicle640: {file: yolox_tiny_coco_640.onnx, sha256: "a885935b0ef432fc864327e3039570500467f568ce9c989b193e70525aa31de9"}
     plate_det640: {file: plate_det_yolox_tiny_640.onnx, sha256: "40be2053a658ceae5a9c94cf93f98a13822513d42e57bf661e4c1f3eb978e428"}
     plate_det416: {file: plate_det_yolox_tiny_416.onnx, sha256: "d1bc8539fe225cfa04e9082d105a8f7f9a4f8bff6fb777a6468ba3937dab54cd"}
   # rk3588 / rk3576 / jetson / hailo / recamera-pro / recamera-2002 由各平台
