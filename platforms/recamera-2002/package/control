@@ -1,0 +1,6 @@
+Package: edge-parking-plate
+Version: @VERSION@
+Architecture: riscv64
+Maintainer: Seeed Studio <support@seeed.cc>
+Description: NRD-2 plate event orchestration for reCamera 2002
+ Standard-library parking hooks with the unified vb-runtime base.

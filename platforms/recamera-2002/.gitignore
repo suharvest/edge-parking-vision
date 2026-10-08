@@ -1,0 +1,9 @@
+.build/
+build/
+out/
+stage/
+*.tar
+*.tar.xz
+*.deb
+*.cvimodel
+*.so

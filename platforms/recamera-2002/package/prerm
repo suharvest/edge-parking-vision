@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+# appMgr owns lifecycle; package removal does not stop or start services.
+exit 0
