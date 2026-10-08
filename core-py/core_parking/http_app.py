@@ -258,7 +258,10 @@ class _Handler(BaseHTTPRequestHandler):
         if picked is None:
             return self._error(404, "no stream")
         ctx, sid = picked
-        body = dict(ctx.state["occ"].snapshot_body())
+        occ = ctx.state.get("occ")
+        if occ is None:   # 当前预设未加载计数模块（slots / plate）
+            return self._error(404, "occupancy not available: counting module not loaded")
+        body = dict(occ.snapshot_body())
         body["stream_id"] = sid
         self._json(body)
 
@@ -267,6 +270,9 @@ class _Handler(BaseHTTPRequestHandler):
         if picked is None:
             return self._error(404, "no stream")
         ctx, sid = picked
+        occ = ctx.state.get("occ")
+        if occ is None:   # 当前预设未加载计数模块（slots / plate）
+            return self._error(404, "occupancy not available: counting module not loaded")
         try:
             body = self._read_json_body()
         except ValueError as exc:
@@ -278,7 +284,6 @@ class _Handler(BaseHTTPRequestHandler):
             return self._error(400, "occupancy 必须为 >= 0 的整数")
         operator = str(body.get("operator") or "http")
         reason = str(body.get("reason") or "manual_set")
-        occ = ctx.state["occ"]
         occ.manual_set(value, operator, reason)
         self.app._publish_occupancy(ctx, "manual_set")
         out = dict(occ.snapshot_body())

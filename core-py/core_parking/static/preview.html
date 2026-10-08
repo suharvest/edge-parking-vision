@@ -35,6 +35,8 @@
 
   // 最近一次 preview.json：图片晚于 json 到达时 load 事件用它重画，而不是清空叠加层。
   let lastJs = null;
+  // /occupancy 只在计数预设存在；收到 404 后不再轮询。
+  let occAvailable = true;
   let frameUrl = null;
 
   function drawBoxes(js) {
@@ -96,11 +98,16 @@
       } else {
         document.getElementById("status").textContent = "preview.json: HTTP " + r.status;
       }
-      const o = await fetch("/occupancy" + q, { cache: "no-store" });
-      if (o.ok) {
-        const js = await o.json();
-        document.getElementById("occ").textContent =
-          `occupancy ${js.occupancy}/${js.capacity} · free ${js.free} · in_today ${js.in_today} · out_today ${js.out_today}`;
+      if (occAvailable) {
+        const o = await fetch("/occupancy" + q, { cache: "no-store" });
+        if (o.ok) {
+          const js = await o.json();
+          document.getElementById("occ").textContent =
+            `occupancy ${js.occupancy}/${js.capacity} · free ${js.free} · in_today ${js.in_today} · out_today ${js.out_today}`;
+        } else if (o.status === 404) {
+          occAvailable = false;
+          document.getElementById("occ").textContent = "occupancy n/a（当前预设无计数模块）";
+        }
       }
     } catch (e) {
       document.getElementById("status").textContent = "error: " + e;

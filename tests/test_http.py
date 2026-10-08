@@ -195,6 +195,16 @@ def test_post_occupancy_manual_set(app):
     assert ctx.state["occ"].last_manual_set["operator"] == "http"
 
 
+def test_occupancy_404_without_counting_module(app):
+    # slots / plate 预设不加载计数模块，ctx.state 没有 "occ"：应 404 而非 500
+    ctx = list(app._streams.values())[0]
+    ctx.state.pop("occ")
+    status, js = _req(app, "GET", "/occupancy?stream=gate-a")
+    assert status == 404
+    status, js = _req(app, "POST", "/occupancy", body={"occupancy": 3})
+    assert status == 404
+
+
 def test_post_occupancy_validates_body(app):
     for bad in ({"occupancy": -1}, {"occupancy": 1.5}, {"occupancy": True}, {}):
         status, _ = _req(app, "POST", "/occupancy", body=bad)
