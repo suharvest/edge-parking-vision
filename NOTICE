@@ -62,3 +62,12 @@ Copyright 2026 Seeed Studio
 基座镜像 ref 与 digest 记录在 platforms/base-images.lock.yaml，镜像内第三方组件见
 Seeed-Solution/retail-vision 的 NOTICE。
 
+
+六、随仓库附带的许可文本
+------------------------
+- licenses/CCPD-MIT.txt：CCPD 的 MIT 许可全文（来自 https://github.com/detectRecog/CCPD/blob/master/LICENSE），
+  适用于 evaluation/data/parity/plate_rec_cn/ 与 evaluation/data/plate_e2e/ 中的 CCPD 派生内容。
+- third_party/vision_base/LICENSE：retail-vision 的 Apache-2.0 全文，适用于 third_party/vision_base/ 与
+  third_party/vb/vb_analyzer_abi.h（后者与上游文件逐字节一致，头部无单独许可声明；Apache-2.0 全文同仓库根目录 LICENSE）。
+- training/exp/yolox_tiny_plate.py 仅 import YOLOX（用户自行安装），仓库不含 YOLOX 源码、权重或 COCO 数据，
+  因此不附带它们的许可文本；上游许可见 LICENSES.md 中的链接。

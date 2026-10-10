@@ -28,7 +28,7 @@
 说明：
 - 裁切图含真实车牌，内容与 CCPD 公开发布的数据集一致，车牌号为公开数据集中的标注。
 - CCPD 完整原图不在本仓库中；评测清单只引用路径，运行评测需自行从 CCPD 官方仓库获取并通过 `--ccpd-root`（或环境变量 `CCPD_ROOT`）指定。
-- 再分发时保留 CCPD 的 MIT 许可声明（见 `NOTICE`）。
+- 再分发时保留 CCPD 的 MIT 许可声明。许可全文：`licenses/CCPD-MIT.txt`（同文本副本在 `evaluation/data/parity/plate_rec_cn/LICENSE-CCPD`），归属说明见 `NOTICE`。
 
 ## 本仓库与第三方组件
 

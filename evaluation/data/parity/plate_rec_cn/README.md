@@ -7,4 +7,4 @@
 - 用途：车牌识别模型在各后端（ONNX / RKNN / TensorRT 等）之间的 parity 对照。
 - 图片含真实车牌，与 CCPD 公开发布的数据集内容一致；标签为数据集标注。
 - CCPD 原图不在本仓库中，本目录只有矫正后的裁切图。
-- 许可见仓库根目录 `LICENSES.md`「CCPD 衍生内容」与 `NOTICE`。
+- 许可全文：同目录 `LICENSE-CCPD`；另见仓库根目录 `LICENSES.md`「CCPD 衍生内容」与 `NOTICE`。
