@@ -91,3 +91,17 @@ RKNN 校准集：CCPD2020 green val 等间隔取 200 张，按运行时裁切（
 ## 发布
 
 `nrd-artifacts/20261010/`：`plate_jetson_orin_nano-b3680529cc01`、`plate_rk3588-a1ca2b551103`、`plate_rk3576-33644b5e41a5`（`.tar.gz`），检测文件与 20261008 包相同，识别文件换为上表三个。Hailo-8 包未重做。
+
+## 结果四：Hailo-8（harvest-pi，HailoRT 4.21.0，504 张设备子集，单帧）
+
+识别 HEF 用 10-08 相同配方重编：wsl2-local 上 `hailo_ai_sw_suite_2025-04:1`（DFC 3.31.0），`--hw-arch hailo8`，`rec.alls` 不变（`normalization1` 折叠 /255、`optimization_level=1, compression_level=0`、校准 batch 8 / 200 张）；校准集为上面 RKNN 用的 200 张运行时裁切图（`calib_rec.npy` sha256 `e6656366…4fd79`）。输出层 SNR 31.21 dB（旧 31.34 dB）。新 HEF sha256 `ad01cdca…cb90`。检测 HEF 沿用 10-08 的 `19a1256a…ca13`。
+
+| 运行 | 检测召回 | 整牌准确率 | 字符准确率 | 门控读数 | 门控精度 | 与新 ONNX 读出一致 | green 200 整牌 | 运行时间 |
+|---|---|---|---|---|---|---|---|---|
+| ONNX FP32 新识别模型（spark） | 98.4% | 77.2% | 92.9% | 84.9% | 88.1% | 504/504 | 74.5% | 75.3 s |
+| Hailo-8 新 HEF | 98.6% | 78.4% | 92.8% | 85.3% | 88.6% | 422/504 | 74.5% | 31.5 s |
+| Hailo-8 旧 HEF（`340db0a6…`） | 98.6% | 51.4% | 80.2% | 53.0% | 83.9% | 274/504 | 50.0% | 31.1 s |
+
+`--backend hailo`：两个 HEF 在同一 VDevice 上用 round-robin 调度；检测输入是与其他后端相同的左上对齐 letterbox 画布（RGB uint8），不是运行时 hailo_source 的拉伸画面；检测 9 个输出按步长拼回 ONNX 的 [1, 8400, 6] 行布局。HailoRT 在解释器退出时段错误（结果 JSON 已写完，见 device-gotchas rpi-hailo）。原始数据：`hailo8_new_harvest-pi.json`、`hailo8_old_rec_harvest-pi.json`。
+
+发布：`nrd-artifacts/20261010/plate_hailo8-b53c31c16b4b.tar.gz`（检测 HEF 不变，识别 HEF 换新）。
