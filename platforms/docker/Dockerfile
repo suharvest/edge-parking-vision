@@ -2,6 +2,8 @@
 # Native Jetson parking application. The base supplies vb-runtime; this image
 # adds the stdlib parking event layer and the vendored vision_base
 # (third_party/vision_base), which takes precedence over the base image's copy.
+# Overlay images (tools/build_overlay_images.sh) keep the base image's own
+# vision_base instead; equivalence of the two copies has not been verified.
 # Models, configs, broker and state are runtime mounts.
 ARG BASE=localhost/vb-base-jetson:local
 FROM ${BASE}

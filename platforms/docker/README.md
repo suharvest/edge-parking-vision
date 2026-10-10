@@ -69,3 +69,11 @@ and the target's CUDA/TRT/NVDEC versions. Use a new container name and ports;
 do not stop existing workloads. A container smoke test is incomplete until
 the target device has demonstrated CUDA initialization, NVDEC pipeline
 startup, IPC, and `/healthz` with the selected model.
+
+## vision_base in the images
+
+- The full image built from `platforms/docker/Dockerfile` runs the vendored `third_party/vision_base`
+  (it is first on `PYTHONPATH`).
+- Overlay images built by `tools/build_overlay_images.sh` replace only `core_parking` files and keep the
+  base image's own `vision_base`. Whether that copy is functionally equivalent to the vendored one has not
+  been verified.
