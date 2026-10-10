@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Python-3.10+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/Runtime-Stdlib_Only-success.svg" alt="Runtime">
   <img src="https://img.shields.io/badge/Tests-480+_passing-brightgreen.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Platforms-Jetson_%7C_RK3588_%7C_RK3576_%7C_Hailo--8_%7C_SG2002_%7C_CPU-orange.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/Platforms-reComputer_J30/J40_%7C_RK3588_%7C_RK3576_%7C_R2000_%7C_reCamera--2002-orange.svg" alt="Platforms">
   <img src="https://img.shields.io/badge/Presets-Counting_%7C_Slots_%7C_Plate_Recognition-blueviolet.svg" alt="Presets">
 </p>
 
@@ -143,11 +143,10 @@
 |---|---|---|---|---|
 | [**Seeed reComputer Industrial J4012 / J3011**](https://www.seeedstudio.com/reComputer-Industrial-J4012-p-5684.html)<br>(NVIDIA Jetson Orin Nano / NX) | TensorRT 10.3 + GStreamer NVDEC | FP16 TensorRT Engine (`.engine`) | 多路高帧率并发视觉分析 | `counting`, `slots`, `plate` |
 | [**Seeed reComputer RK3588**](https://www.seeedstudio.com/reComputer-RK3588-40-p-6818.html)<br>(Rockchip RK3588) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 (INT8) + FP16 输出 (`.rknn`) | 工业级边缘微服务器 / 多路智能盒子 | `counting`, `slots`, `plate` |
-| [**Seeed reComputer Industrial R2235**](https://www.seeedstudio.com/reComputer-Industrial-R2235-12-p-6654.html)<br>(Rockchip RK3576) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 (INT8) + FP16 输出 (`.rknn`) | 紧凑型边缘网关 / 单机双车道闸口 | `counting`, `slots`, `plate` |
-| **树莓派 5 + Hailo-8** | HailoRT 4.21.0 (26 TOPS NPU) | INT8 HEF (`.hef`) | 低功耗模块化边缘工控机 | `counting`, `plate` |
+| [**Seeed reComputer RK3576**](https://www.seeedstudio.com/reComputer-RK3576-30-p-6815.html)<br>(Rockchip RK3576) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 (INT8) + FP16 输出 (`.rknn`) | 紧凑型边缘网关 / 单机双车道闸口 | `counting`, `slots`, `plate` |
+| [**Seeed reComputer Industrial R2000 (R2035-12)**](https://www.seeedstudio.com/reComputer-Industrial-R2035-12-p-6542.html)<br>(Raspberry Pi 5 + Hailo-8) | HailoRT 4.21.0 (26 TOPS NPU) | INT8 HEF (`.hef`) | 低功耗无风扇工业级边缘工控机 | `counting`, `plate` |
 | [**Seeed reCamera-2002**](https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html)<br>(算能 SG2002 / CV181x RISC-V) | INT8 CVIMODEL (`.cvimodel`) | 一体化全内置智能摄像机（deb 包部署） | `plate`, `counting` |
-| **x86 / ARM CPU** | ONNX Runtime CPU | FP32 ONNX (`.onnx`) | 开发调试、基准对照、低频通道 | `counting`, `slots`, `plate` |
-| **R1124 网关** | Mosquitto MQTT + Telegraf | — | 现场边缘通信中枢与遥测聚合 | 消息代理、Grafana 看板 |
+| [**Seeed reComputer R1100 (R1124-10)**](https://www.seeedstudio.com/reComputer-R1124-10-p-6257.html)<br>(边缘 IoT 控制器与网关) | Mosquitto MQTT + Telegraf | — | 现场边缘通信中枢与遥测聚合 | 消息代理、Grafana 看板 |
 
 ### Seeed Studio 方案与硬件深度集成
 
@@ -163,7 +162,9 @@
   - [reComputer Industrial J4012](https://www.seeedstudio.com/reComputer-Industrial-J4012-p-5684.html) / [J3011](https://www.seeedstudio.com/reComputer-Industrial-J3011-p-5682.html)：无风扇工业级 Jetson Orin 边缘主机，适合多路车道进出高并发分析。
   - [reComputer Rugged J4012](https://www.seeedstudio.com/reComputer-Rugged-J4012-p-6920.html) / [J3011](https://www.seeedstudio.com/reComputer-Rugged-J3011-p-6921.html)：IP66 级防水防尘全密封户外加固型边缘计算机。
   - [reComputer RK3588 (R1000)](https://www.seeedstudio.com/reComputer-RK3588-40-p-6818.html)：高性能瑞芯微 6 TOPS NPU 工业工控机。
-  - [reComputer Industrial R2235 (RK3576)](https://www.seeedstudio.com/reComputer-Industrial-R2235-12-p-6654.html)：导轨式工业网关，具备丰富物理 IO 接口直驱道闸继电器。
+  - [reComputer RK3576 (RK3576-30)](https://www.seeedstudio.com/reComputer-RK3576-30-p-6815.html)：紧凑型瑞芯微 6 TOPS NPU 边缘主机。
+  - [reComputer Industrial R2000 (R2035-12)](https://www.seeedstudio.com/reComputer-Industrial-R2035-12-p-6542.html)：树莓派 5 + Hailo-8 (26 TOPS NPU) 无风扇工业级边缘主机。
+  - [reComputer R1100 (R1124-10)](https://www.seeedstudio.com/reComputer-R1124-10-p-6257.html)：工业级边缘 IoT 控制器与网关，用于现场部署 MQTT Broker 与遥测采集。
 
 ---
 
@@ -186,10 +187,10 @@
 
 | 边缘硬件设备 | 加速后端与精度 | 检测召回率 | 整牌准确率 | 门控精度 | 总计耗时 (504 张) | 折合吞吐率 |
 |---|---|---|---|---|---|---|
-| **NVIDIA Jetson Orin Nano** | TensorRT FP16 | 98.4% | 77.4% | 88.6% | **30.7 s** | ~61.4 FPS |
-| **Rockchip RK3588** | RKNN INT8 (W8A8) | 98.8% | 78.8% | 88.8% | **38.5 s** | ~76.4 FPS |
-| **Rockchip RK3576** | RKNN INT8 (W8A8) | 98.8% | 79.0% | 89.0% | **53.4 s** | ~53.4 FPS |
-| **树莓派 5 + Hailo-8** | HailoRT INT8 | 98.6% | 78.4% | 88.5% | — | ~50+ FPS |
+| **Seeed reComputer J3011** (Jetson Orin Nano) | TensorRT FP16 | 98.4% | 77.4% | 88.6% | **30.7 s** | ~61.4 FPS |
+| **Seeed reComputer RK3588** (Rockchip RK3588) | RKNN INT8 (W8A8) | 98.8% | 78.8% | 88.8% | **38.5 s** | ~76.4 FPS |
+| **Seeed reComputer RK3576** (Rockchip RK3576) | RKNN INT8 (W8A8) | 98.8% | 79.0% | 89.0% | **53.4 s** | ~53.4 FPS |
+| **Seeed reComputer Industrial R2035** (Pi 5 + Hailo-8) | HailoRT INT8 | 98.6% | 78.4% | 88.5% | — | ~50+ FPS |
 
 ---
 

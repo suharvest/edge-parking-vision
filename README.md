@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Python-3.10+-green.svg" alt="Python">
   <img src="https://img.shields.io/badge/Runtime-Stdlib_Only-success.svg" alt="Runtime">
   <img src="https://img.shields.io/badge/Tests-480+_passing-brightgreen.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Platforms-Jetson_%7C_RK3588_%7C_RK3576_%7C_Hailo--8_%7C_SG2002_%7C_CPU-orange.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/Platforms-reComputer_J30/J40_%7C_RK3588_%7C_RK3576_%7C_R2000_%7C_reCamera--2002-orange.svg" alt="Platforms">
   <img src="https://img.shields.io/badge/Presets-Counting_%7C_Slots_%7C_Plate_Recognition-blueviolet.svg" alt="Presets">
 </p>
 
@@ -143,11 +143,10 @@ The repository unifies three practical parking scenarios via configurable preset
 |---|---|---|---|---|
 | [**Seeed reComputer Industrial J4012 / J3011**](https://www.seeedstudio.com/reComputer-Industrial-J4012-p-5684.html)<br>(NVIDIA Jetson Orin Nano / NX) | TensorRT 10.3 + GStreamer NVDEC | FP16 TensorRT (`.engine`) | High-density multi-stream inference | `counting`, `slots`, `plate` |
 | [**Seeed reComputer RK3588**](https://www.seeedstudio.com/reComputer-RK3588-40-p-6818.html)<br>(Rockchip RK3588) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 INT8 + FP16 out (`.rknn`) | Multi-channel edge box & industrial PC | `counting`, `slots`, `plate` |
-| [**Seeed reComputer Industrial R2235**](https://www.seeedstudio.com/reComputer-Industrial-R2235-12-p-6654.html)<br>(Rockchip RK3576) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 INT8 + FP16 out (`.rknn`) | Compact edge gateway / dual-lane gate | `counting`, `slots`, `plate` |
-| **Raspberry Pi 5 + Hailo-8** | HailoRT 4.21.0 (26 TOPS NPU) | INT8 HEF (`.hef`) | Modular low-power edge AI | `counting`, `plate` |
+| [**Seeed reComputer RK3576**](https://www.seeedstudio.com/reComputer-RK3576-30-p-6815.html)<br>(Rockchip RK3576) | 6 TOPS NPU (RKNN-Toolkit2 2.3.2) | W8A8 INT8 + FP16 out (`.rknn`) | Compact edge gateway / dual-lane gate | `counting`, `slots`, `plate` |
+| [**Seeed reComputer Industrial R2000 (R2035-12)**](https://www.seeedstudio.com/reComputer-Industrial-R2035-12-p-6542.html)<br>(Raspberry Pi 5 + Hailo-8) | HailoRT 4.21.0 (26 TOPS NPU) | INT8 HEF (`.hef`) | Fanless industrial edge AI | `counting`, `plate` |
 | [**Seeed reCamera-2002**](https://www.seeedstudio.com/reCamera-2002w-8GB-p-6250.html)<br>(Sophgo SG2002 / CV181x RISC-V) | INT8 CVIMODEL (`.cvimodel`) | Standalone smart IP camera (deb package) | `plate`, `counting` |
-| **x86 / ARM CPU** | ONNX Runtime | FP32 ONNX (`.onnx`) | Development, CI/testing, low-load entry | `counting`, `slots`, `plate` |
-| **R1124 Gateway** | Mosquitto MQTT + Telegraf | — | Field broker & telemetry aggregation | MQTT broker, Grafana |
+| [**Seeed reComputer R1100 (R1124-10)**](https://www.seeedstudio.com/reComputer-R1124-10-p-6257.html)<br>(Edge IoT Gateway & Controller) | Mosquitto MQTT + Telegraf | — | Field broker & telemetry aggregation | MQTT broker, Grafana |
 
 ### Seeed Studio Solutions & Hardware Integration
 
@@ -163,7 +162,9 @@ The repository unifies three practical parking scenarios via configurable preset
   - [reComputer Industrial J4012](https://www.seeedstudio.com/reComputer-Industrial-J4012-p-5684.html) / [J3011](https://www.seeedstudio.com/reComputer-Industrial-J3011-p-5682.html): Fanless industrial PCs with Jetson Orin for dusty or factory environments.
   - [reComputer Rugged J4012](https://www.seeedstudio.com/reComputer-Rugged-J4012-p-6920.html) / [J3011](https://www.seeedstudio.com/reComputer-Rugged-J3011-p-6921.html): IP66-rated waterproof and dustproof outdoor enclosure.
   - [reComputer RK3588 (R1000)](https://www.seeedstudio.com/reComputer-RK3588-40-p-6818.html): High-compute edge AI box for multi-channel video analysis.
-  - [reComputer Industrial R2235 (RK3576)](https://www.seeedstudio.com/reComputer-Industrial-R2235-12-p-6654.html): DIN-rail industrial controller with rich I/O and wide temperature range.
+  - [reComputer RK3576 (RK3576-30)](https://www.seeedstudio.com/reComputer-RK3576-30-p-6815.html): Compact edge AI box powered by Rockchip RK3576.
+  - [reComputer Industrial R2000 (R2035-12)](https://www.seeedstudio.com/reComputer-Industrial-R2035-12-p-6542.html): Fanless industrial PC powered by Raspberry Pi 5 + Hailo-8 (26 TOPS NPU).
+  - [reComputer R1100 (R1124-10)](https://www.seeedstudio.com/reComputer-R1124-10-p-6257.html): Industrial IoT gateway & edge controller for field MQTT broker and device integration.
 
 ---
 
@@ -186,10 +187,10 @@ All benchmarks are measured against official CCPD holdout datasets and verified 
 
 | Edge Device | Backend & Precision | Detection Recall | Whole-Plate Acc | Gate Precision | Benchmark Latency (504 imgs) | Effective Throughput |
 |---|---|---|---|---|---|---|
-| **NVIDIA Jetson Orin Nano** | TensorRT FP16 | 98.4% | 77.4% | 88.6% | **30.7 s** | ~61.4 FPS |
-| **Rockchip RK3588** | RKNN INT8 (W8A8) | 98.8% | 78.8% | 88.8% | **38.5 s** | ~76.4 FPS |
-| **Rockchip RK3576** | RKNN INT8 (W8A8) | 98.8% | 79.0% | 89.0% | **53.4 s** | ~53.4 FPS |
-| **Raspberry Pi 5 + Hailo-8** | HailoRT INT8 | 98.6% | 78.4% | 88.5% | — | ~50+ FPS |
+| **Seeed reComputer J3011** (Jetson Orin Nano) | TensorRT FP16 | 98.4% | 77.4% | 88.6% | **30.7 s** | ~61.4 FPS |
+| **Seeed reComputer RK3588** (Rockchip RK3588) | RKNN INT8 (W8A8) | 98.8% | 78.8% | 88.8% | **38.5 s** | ~76.4 FPS |
+| **Seeed reComputer RK3576** (Rockchip RK3576) | RKNN INT8 (W8A8) | 98.8% | 79.0% | 89.0% | **53.4 s** | ~53.4 FPS |
+| **Seeed reComputer Industrial R2035** (Pi 5 + Hailo-8) | HailoRT INT8 | 98.6% | 78.4% | 88.5% | — | ~50+ FPS |
 
 *Note: Detailed evaluation logs, raw execution records, and confusion matrices are available under `evaluation/results/`.*
 
