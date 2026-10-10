@@ -3,27 +3,58 @@ edge-parking-vision
 
 Copyright 2026 Seeed Studio
 
-本仓库按 Apache License 2.0 发布（见 LICENSE）。本文件按规格 §S1 只列出
-「停车仓库自己拷入的文件」与「基座镜像 ref + digest」；不罗列基座镜像的
-全部依赖（其第三方组件见 retail-vision 的 NOTICE）。
+本仓库按 Apache License 2.0 发布（见 LICENSE）。本文件列出本仓库中来自其他项目的文件，
+以及仓库内数据、媒体所依据的来源与许可。
 
-C0 阶段以下为占位（文件尚未拷入 / 镜像尚未发布，来源与许可已在对应行注明）：
-
-计划拷入的文件（来源均带各自许可，拷入时保持原样）：
+一、从其他仓库拷入的文件
+------------------------
 - third_party/vb/vb_analyzer_abi.h
-  来源：retail-vision（github.com/Seeed-Solution/retail-vision），
-  tag vision-base-v<semver>（发布后填写），Apache License 2.0。
-- platforms/host-mounts/{jetson,rk3576,rk3588,hailo}.yaml
-  来源：retail-vision 同一 tag 的 platforms/host-mounts/，Apache License 2.0。
-- platforms/jetson/build_engine.sh
-  来源：fall-detection origin/main@5af128d，Apache License 2.0。
-- third_party/nlohmann/json.hpp + LICENSE.MIT
-  来源：nlohmann/json v3.11.3，MIT License。
+  来源：Seeed-Solution/retail-vision，core-cpp/vb/include/vb/vb_analyzer_abi.h，
+  Apache License 2.0。与上游同名文件逐字节一致（cmp 校验）。
 
-基座镜像 ref + digest：
-- vision-base-{cpu,jetson,rk,hailo}：尚未发布，digest 待
-  platforms/base-images.lock.yaml（子任务 X0）锁定后在此补录。
+本仓库自行编写、非拷贝的文件：
+- platforms/host-mounts/{jetson,rk3576,rk3588,hailo}.yaml：依据各板卡 compose 挂载项整理，
+  文件头注释记录了推导来源。
+- platforms/jetson/build_engine.sh：本仓库编写，参数约定与早期 fall-detection 的同名辅助脚本相近。
 
-edge-security-kit（无 LICENSE）不拷入任何文件、只借设计，故不出现在本文件。
-edge-inspection-assembly 的 RKNN/Hailo 转换脚本只照写法重写、不整文件拷贝
-（其 LICENSE 未核实前不进 NOTICE）。
+二、数据集
+----------
+- CCPD（Xu, Z. et al., "Towards End-to-End License Plate Detection and Recognition:
+  A Large Dataset and Baseline", ECCV 2018）。https://github.com/detectRecog/CCPD
+  MIT License, Copyright (c) 2017 CCPD。
+  本仓库包含的派生内容：
+    evaluation/data/parity/plate_rec_cn/crops/（200 张 CCPD2020 绿牌 val 矫正裁切图）与 crops.jsonl（标签）；
+    evaluation/data/plate_e2e/eval_set.jsonl、device_subset.jsonl（CCPD 原图相对路径、车牌号、检测框）。
+  训练脚本（training/）读取用户自备的 CCPD 数据，CCPD 原图不在本仓库中。
+  裁切图含真实车牌，内容与 CCPD 公开数据集一致。
+
+- COCO 2017（COCO Consortium）。标注 CC BY 4.0，图片版权归各 Flickr 作者。
+  车辆检测基线 `yolox_tiny_coco` 的预训练权重来自 COCO 训练；本仓库不含 COCO 图片，也不含权重文件。
+
+三、模型与代码
+--------------
+- YOLOX（Megvii-BaseDetection/YOLOX，0.3.0），Apache License 2.0。
+  训练/导出脚本调用 YOLOX 代码；预训练权重 yolox_tiny.pth（release 0.1.1rc0，
+  sha256 9de513de589ac98bb92d3bca53b5af7b9acfa9b0bacb831f7999d0f7afaee8f0）
+  由用户从上游 release 下载，不在本仓库中。MODEL-CARD.json 记录版本与 sha256。
+- 本仓库不含 ONNX / RKNN / TensorRT / HEF 模型文件，models/ 下仅有注册表与 SHA256SUMS。
+- rknn-toolkit2、TensorRT/CUDA、HailoRT、TPU-MLIR 为转换机或宿主机组件，不随本仓库分发，
+  见 LICENSES.md。
+
+四、媒体
+--------
+- evaluation/data/{parity/vehicle416,parity/plate_det640,calib/frames}/ 的帧取自
+  Wikimedia Commons 视频 "BLK-HDPTZ12 Security Camera Parking Lot Surveillance Video"
+  （作者 Supercircuits，标注 Public domain；来源页与 sha256 见 evaluation/data/SOURCES.csv 与
+  evaluation/data/video.sha256）。原始视频不在本仓库中。
+- tests/fixtures/dev_gate_10s.mp4、dev_gate_10s_mpeg4.mp4（各 50 帧，10 秒）：
+  经与上述视频逐帧比对（缩到 64x36 灰度，首帧与源视频 5.0 s 处帧 MSE 0.15，
+  中间帧与 104.75 s 处 MSE 1.5，末帧与 201.0 s 处 MSE 0.3），内容取自该视频；
+  仓库内无记录这两个文件裁切方式的脚本或提交说明。
+
+五、基座镜像
+------------
+基座镜像 ref 与 digest 记录在 platforms/base-images.lock.yaml，镜像内第三方组件见
+Seeed-Solution/retail-vision 的 NOTICE。
+
+edge-security-kit（无 LICENSE）不拷入任何文件。
