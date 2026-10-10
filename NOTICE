@@ -38,7 +38,7 @@ Copyright 2026 Seeed Studio
   sha256 9de513de589ac98bb92d3bca53b5af7b9acfa9b0bacb831f7999d0f7afaee8f0）
   由用户从上游 release 下载，不在本仓库中。MODEL-CARD.json 记录版本与 sha256。
 - 本仓库不含 ONNX / RKNN / TensorRT / HEF 模型文件，models/ 下仅有注册表与 SHA256SUMS。
-- rknn-toolkit2、TensorRT/CUDA、HailoRT、TPU-MLIR 为转换机或宿主机组件，不随本仓库分发，
+- rknn-toolkit2、TensorRT/CUDA、HailoRT 为转换机或宿主机组件，不随本仓库分发，
   见 LICENSES.md。
 
 四、媒体

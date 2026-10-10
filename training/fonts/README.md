@@ -1,23 +1,22 @@
 # training/fonts —— 合成车牌字体
 
-NRD-3 §8 P3 / §7「合成车牌生成器」用字体。**字体文件不入库**（下方下载到本目录）。
+合成车牌生成器（`training/plate_synth.py`）用字体。**字体文件不入库**（下方下载到本目录）。
 
 ## Noto Sans CJK SC Bold（本期唯一需要的字体）
 
 | 项 | 值 |
 |---|---|
-| 用途 | `training/plate_synth.py` 绘制中国大陆车牌（省份简称与字母数字；Alte DIN 1451 随德国制式暂缓，§0.1） |
+| 用途 | `training/plate_synth.py` 绘制中国大陆车牌（省份简称与字母数字；Alte DIN 1451 随德国制式暂缓） |
 | 许可 | **SIL Open Font License 1.1** |
 | 许可原文（仓库） | https://github.com/notofonts/noto-cjk/blob/main/Sans/LICENSE |
 | 商用 | 允许（字体不得单独出售） |
 
-### 许可核实结论（2026-09-28，NRD-3 §7「需核实」项）
+### 许可核实结论（2026-09-28）
 
 从上述仓库 raw 地址（`https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/LICENSE`）
 取得 LICENSE 全文（92 行）：开头即「This Font Software is licensed under the SIL Open
 Font License, Version 1.1.」，其后为 OFL-1.1 标准全文与版权行「Copyright 2014-2021
-Adobe (http://www.adobe.com/)」。**结论：SIL OFL-1.1 属实，可用且允许商用**；已按 §7
-要求将 LICENSE 原文存档于本文件末尾，并登记进仓库根 `LICENSES.md`。
+Adobe (http://www.adobe.com/)」。**结论：SIL OFL-1.1 属实，可用且允许商用**；已登记进仓库根 `LICENSES.md`。
 
 ### 下载
 
@@ -28,7 +27,7 @@ curl -L -o training/fonts/NotoSansCJKsc-Bold.otf \
 
 （约 16 MB；也可用同仓库 Variable 版 `Sans/Variable/OTF/NotoSansCJKsc-VF.otf`。）
 
-## 暂缓（本期不做，§0.1）
+## 暂缓
 
 - Alte DIN 1451 Mittelschrift（德国牌）：许可来源矛盾（OFL-1.1 或 CC BY 3.0 DE），
   待德国制式恢复时以字体压缩包内自带许可文件为准再核实。

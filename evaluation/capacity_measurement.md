@@ -4,8 +4,7 @@
 `evaluation/stress_slots.py` 保持既有 health FPS minimum、strict native、
 queue、drops 记录和 RK RGA 判据；旧 raw 不会被重新判定。
 
-该窗口规则是本次容量测量的冻结具体化，不能表述为 NRD4 原文已经规定
-120 秒窗口、native completed counter 或 BASE-1 §10.1 对 NRD4 的直接授权。
+该窗口规则是本次容量测量采用的约定，不是上游规格中已有的要求。
 默认运行目标为 `--fps-window-secs 120`，容量运行仍要求 poll 与 native
 覆盖至少 600 秒。
 

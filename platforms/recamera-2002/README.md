@@ -1,6 +1,6 @@
 # reCamera 2002 package preparation
 
-This directory is the NRD-3 SG2002 plate preparation path. It contains no model weights
+This directory is the SG2002 plate preparation path. It contains no model weights
 and packaging does not start or stop a device service.
 
 `build-python-runtime.sh` stages CPython 3.11.17 under `/opt/vb/python` using

@@ -1,12 +1,12 @@
-# NRD-2 P7 —— 演示看板（可选，仅演示）
+# 演示看板（可选，仅演示）
 
-规格：`docs/rd-specs/NRD-2-parking-vehicle-counting.md` §8.3 P7、§S3（信封）、§S12（R1124 broker 与 ACL）。
+事件信封格式见 `contracts/`。
 
 **此目录只作演示，不作产品能力。**
 
 组成：telegraf + InfluxDB 2 + Grafana，**不含 broker**——正式部署时 broker 是 R1124 上的
-systemd mosquitto（§S12），telegraf 以 `viewer` 角色连接（ACL 只读 `+/parking/#`），
-订阅 `+/parking/+/occupancy`，把 §S3 的 `parking.occupancy/1` 信封写入 InfluxDB。
+systemd mosquitto，telegraf 以 `viewer` 角色连接（ACL 只读 `+/parking/#`），
+订阅 `+/parking/+/occupancy`，把 `parking.occupancy/1` 信封写入 InfluxDB。
 
 ## 运行
 

@@ -6,8 +6,8 @@ into two images:
 1. `localhost/vb-base-jetson:local` is built from `retail-vision/docker/base-jetson.Dockerfile`.
    Its input is an artifact image containing a `vb-runtime` compiled on a
    Jetson with the exact CUDA/TensorRT/GStreamer SDK used by that host.
-2. The parking image is built here and contains only `core_parking`. NRD-2,
-   NRD-3 and NRD-4 share it; the mounted `vb.config/1` JSON selects the
+2. The parking image is built here and contains only `core_parking`. The
+   counting, plate and slots applications share it; the mounted `vb.config/1` JSON selects the
    backend, model and business preset.
 
 The base build must record the artifact source snapshot and the SHA256 of

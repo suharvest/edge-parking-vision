@@ -35,22 +35,21 @@
 | 组件 | 版本 / 地址 | 许可 | 原文 | 商用 | 署名 |
 |---|---|---|---|---|---|
 | edge-parking-vision 自身代码 | 本仓库 | Apache-2.0 | 仓库 `LICENSE` | 是 | NOTICE |
-| retail-vision（`vision_base` Python 包 + `vb-runtime` + 基座镜像 `vision-base-<p>`） | tag `vision-base-v<semver>`；镜像 digest 见 §S11.2 锁文件 | Apache-2.0（仓库 `LICENSE` 首行，BASE-1 §1） | 仓库 LICENSE | 是 | NOTICE 写明 tag 与各镜像 digest；镜像内第三方组件见 retail-vision `NOTICE` |
+| retail-vision（`vision_base` Python 包 + `vb-runtime` + 基座镜像 `vision-base-<p>`） | tag `vision-base-v<semver>`；镜像 digest 见 `platforms/base-images.lock.yaml` | Apache-2.0（仓库 `LICENSE` 首行） | 仓库 LICENSE | 是 | NOTICE 写明 tag 与各镜像 digest；镜像内第三方组件见 retail-vision `NOTICE` |
 | retail-vision 拷入文件（`vb_analyzer_abi.h`、`host-mounts/*.yaml`） | 同一 tag | Apache-2.0 | 仓库 LICENSE | 是 | NOTICE |
-| fall-detection 拷入文件（`build_engine.sh`） | `origin/main` `5af128d` | Apache-2.0（2026-09-26 读仓库 `LICENSE` 首行） | 仓库 LICENSE | 是 | NOTICE |
-| edge-inspection-assembly（转换脚本写法参考、MODEL-CARD/SHA256SUMS 格式） | commit `5da8dde` | 需核实该仓库 LICENSE 文件 | — | — | 未核实前不整文件拷贝（本任务仅参考文件格式，未拷贝文件内容） |
-| edge-security-kit | HEAD `761edad` | 无 LICENSE 文件 | — | 不拷代码，只借设计 | 不入 NOTICE |
-| rknn-toolkit2（仅转换机）/ librknnrt（宿主挂载，基座 C++ 直调） | 2.3.2（Pro）；RK 板按宿主版本 | Rockchip 许可 | 需核实 | 运行库不随镜像分发 | — |
-| TensorRT / CUDA（宿主挂载，不分发） | JetPack 6 | NVIDIA 许可 | 需核实 | 不随镜像分发 | — |
-| HailoRT（`libhailort` 宿主挂载）/ Dataflow Compiler（仅转换机） | 4.21.0 | Hailo 许可（Developer Zone click-through 分发） | 需核实 | 不随镜像、不随上游包分发；HEF 为我方产物 | — |
-| TPU-MLIR（转换机容器 sophgo/tpuc_dev:v3.1） | — | 需核实（上游标 BSD-2? 未打开原文） | — | — | — |
+| fall-detection（早期内部仓库，无公开来源） | — | — | — | 仅作 `platforms/jetson/build_engine.sh` 参数约定与 `platforms/host-mounts/*.yaml` 挂载项的设计参考；本仓库文件为自行编写，未拷入其文件 | — |
+| edge-inspection-assembly（转换脚本写法、MODEL-CARD/SHA256SUMS 格式的参考） | — | — | — | 仅参考文件格式，未拷贝文件内容 | — |
+| edge-security-kit | — | — | — | 仅借设计，未拷贝代码 | — |
+| rknn-toolkit2（仅转换机）/ librknnrt（宿主挂载） | 2.3.2；RK 板按宿主版本 | RKNN SDK License（Rockchip；https://github.com/airockchip/rknn-toolkit2/blob/master/LICENSE，2026-10-10 核对仓库 LICENSE 首行） | 同左 | 不随本仓库分发；用户自行从 Rockchip 获取 | — |
+| TensorRT / CUDA（宿主挂载） | JetPack 6 | NVIDIA 许可（随 JetPack 安装） | 随 JetPack | 不随本仓库、不随镜像分发 | — |
+| HailoRT（`libhailort` 宿主挂载）/ Dataflow Compiler（仅转换机） | 4.21.0 | HailoRT：libhailort、pyhailort、hailortcli 为 MIT，hailonet GStreamer 插件为 LGPL-2.1-or-later（https://github.com/hailo-ai/hailort README，2026-10-10 核对）；Dataflow Compiler 为 Hailo Developer Zone 许可 | 同左 | 不随本仓库分发；HEF 为本项目产物 | — |
 | Grafana（演示看板示例） | — | AGPL-3.0 | https://github.com/grafana/grafana/blob/main/LICENSE | 作为独立未修改服务运行，不链接、不分发修改；写明「用户自行部署」 | — |
 | Eclipse Mosquitto（R1124 broker，系统包；开发用 `eclipse-mosquitto:2` 镜像） | ≥2.0 | EPL-2.0 OR EDL-1.0（SPDX `EPL-2.0 OR BSD-3-Clause`） | https://github.com/eclipse-mosquitto/mosquitto/blob/master/LICENSE.txt（2026-09-26 原文核实） | 是（独立服务，不链接） | — |
 
-## 测试素材（§S6）
+## 测试素材
 
 | 素材 | 许可 | 原文/来源 | 商用 | 处理 |
 |---|---|---|---|---|
-| dev 集（Wikimedia Commons 车辆视频） | 逐文件记录于 `evaluation/data/SOURCES.csv`（仅收 CC0/PD、CC BY 4.0、CC BY-SA 4.0） | Commons 文件页 | 按 §S6 | 逐文件写 SOURCES.csv；CC BY-SA 素材不进 gallery；原始视频不入库（sha256 记录于 `evaluation/data/video.sha256`） |
+| dev 集（Wikimedia Commons 车辆视频） | 逐文件记录于 `evaluation/data/SOURCES.csv`（仅收 CC0/PD、CC BY 4.0、CC BY-SA 4.0） | Commons 文件页 | 按 SOURCES.csv 逐文件许可 | 逐文件写 SOURCES.csv；CC BY-SA 素材不进 gallery；原始视频不入库（sha256 记录于 `evaluation/data/video.sha256`） |
 | test 集（自拍出数视频） | 自拍 | — | 是 | 不外发（`evaluation/data/private/`，gitignore）；发布前车牌打码 |
 | AI City Challenge / UA-DETRAC 等数据集 | — | — | 禁止（许可不明或仅研究用途；UA-DETRAC 未核实前不用） | 不使用 |
