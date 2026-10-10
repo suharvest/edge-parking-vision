@@ -5,7 +5,7 @@
 - 形状检查 1×3×32×96 → 1×C×24；不含 Softmax/LogSoftmax/Squeeze/AdaptiveAvgPool
   （节点类型检查由 tests/test_platerec_export.py 负责）。
 
-用法（spark 工作区）：.venv/bin/python training/export_platerec.py \
+用法（GPU x86 工作站工作区）：.venv/bin/python training/export_platerec.py \
     --ckpt training/outputs/platerec_cn/best.pth --out models/plate_rec_cn_96x32.onnx
 """
 from __future__ import annotations

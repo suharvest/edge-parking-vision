@@ -77,16 +77,19 @@ class SpoolPublisher:
 
     # ------------------------------------------------------------- 钩子侧
 
-    def publish(self, kind: str, ctx, body: dict, ts: int) -> None:
+    def publish(self, kind: str, ctx, body: dict, ts: int, *, seq: int | None = None,
+                event_id: str | None = None) -> dict:
         """非阻塞：分配 seq、生成信封、入内存队列。ctx 需有 stream_id 与
         state["seq"]（SeqAllocator）——即 §6.2 ParkingHooks 的 StreamContext。"""
         seq_alloc = ctx.state["seq"]
         if not isinstance(seq_alloc, SeqAllocator):
             raise TypeError('ctx.state["seq"] 必须是 envelope.SeqAllocator')
+        wire_seq = seq_alloc.next() if seq is None else seq
         env = build_envelope(kind, site_id=self._site_id, camera_id=ctx.stream_id,
-                             ts=ts, seq=seq_alloc.next(), body=body)
+                             ts=ts, seq=wire_seq, body=body, event_id=event_id)
         self._last_event_ts = int(ts)
         self._q.put_nowait((topic_for(self._site_id, ctx.stream_id, kind), kind, env))
+        return env
 
     def health(self) -> dict:
         """§S13 B2：/healthz 的 app 子对象字段。"""

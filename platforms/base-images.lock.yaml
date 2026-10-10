@@ -1,14 +1,15 @@
-# 基座镜像锁（规格 §S11.2）。X0 建立。
+# 基座镜像锁。
 #
-# 状态（X0 执行时）：
-#   - retail-vision 尚未打 vision-base-v* tag，也无 platforms/base-images.lock.yaml（上游缺失，已按 §S13 汇报）。
-#   - vision-base-<p> 镜像尚未推送，digest 全部保持「需核实」——按 §8.0 X0 行：脚本与测试先做，测试按设计失败。
-#   - tag 与 digest 就绪后执行 `bash tools/check_base_images.sh --sync` 从上游锁文件填入，禁止手编 digest。
+# 状态：
+#   - 基座镜像 vision-base-<p> 尚未发布，digest 保持「需核实」；
+#     相关两个测试（tests/test_base_images.py）在占位状态下跳过。
+#   - vision_base Python 包已内置在 third_party/vision_base/（来源见其 README.md）。
+#   - 镜像与 tag 发布后执行 `bash tools/check_base_images.sh --sync` 从上游锁文件填入，禁止手编 digest。
 retail_vision_repo: https://github.com/Seeed-Solution/retail-vision
-retail_vision_tag: "需核实"          # BASE-1 §11 D3；应为 vision-base-v<semver>，与 pyproject 依赖同号（当前基座未打 tag）
+retail_vision_tag: "需核实"          # 应为 vision-base-v<semver>（当前基座未打 tag）
 source_lock: platforms/base-images.lock.yaml      # retail-vision 同一 tag 下的锁文件，本文件各 digest 必须与之相同
 bases:
-  cpu:    {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-cpu:需核实,    digest: "需核实"}   # X0 从 retail-vision 锁文件填入
+  cpu:    {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-cpu:需核实,    digest: "需核实"}   # 从 retail-vision 锁文件填入
   jetson: {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-jetson:需核实, digest: "需核实", host_mounts: platforms/host-mounts/jetson.yaml}
   rk:     {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-rk:需核实,     digest: "需核实", host_mounts: {rk3576: platforms/host-mounts/rk3576.yaml, rk3588: platforms/host-mounts/rk3588.yaml}}
   hailo:  {ref: sensecraft-missionpack.seeed.cn/solution/vision-base-hailo:需核实,  digest: "需核实", host_mounts: platforms/host-mounts/hailo.yaml, hailort_expected: "4.21.0"}

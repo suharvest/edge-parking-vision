@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """平台验收工具（规格 §S9「accept_platform.py」行、§8.1 C4）。
 
-在 Mac / spark 上运行，连到被测设备：
+在 Mac / Linux 工作站上运行，连到被测设备：
   - 在 --minutes 内周期读取基座 /healthz（含停车 app 子对象，§S4）：
     每路 streams[].fps ≥ --min-fps；body 必须是可解析的 JSON 且 status == "ok"。
   - 读 MQTT 抓包 JSONL（每行 {"topic": str, "payload": object}）：
@@ -36,6 +36,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "contracts"))
 import validate_payload  # noqa: E402
 
 EVENT_KINDS = ("crossing", "occupancy", "plate", "plate_crop", "gate", "slots")
+VALIDATOR_KINDS = {
+    "crossing": "crossing",
+    "occupancy": "occupancy",
+    "plate": "plate-event",
+    "plate_crop": "plate-crop",
+    "gate": "gate-event",
+    "slots": "slots",
+}
 
 
 def _fetch_healthz(source: str, timeout_s: float = 5.0) -> dict:
@@ -91,6 +99,7 @@ def _check_status_payload(payload: object, problems: list[str], label: str) -> N
 
 def _check_dump(path: str, warnings: list[str], problems: list[str]) -> dict:
     counts: dict[str, int] = {}
+    by_kind: dict[str, dict[str, int]] = {}
     invalid = 0
     with open(path, encoding="utf-8") as f:
         for lineno, line in enumerate(f, 1):
@@ -102,6 +111,10 @@ def _check_dump(path: str, warnings: list[str], problems: list[str]) -> dict:
                 rec = json.loads(line)
             except json.JSONDecodeError as e:
                 problems.append(f"{label}: JSON 解析失败: {e}")
+                invalid += 1
+                continue
+            if not isinstance(rec, dict):
+                problems.append(f"{label}: 记录不是 object")
                 invalid += 1
                 continue
             topic = rec.get("topic")
@@ -119,21 +132,32 @@ def _check_dump(path: str, warnings: list[str], problems: list[str]) -> dict:
                 continue
             kind = topic.rsplit("/", 1)[-1]
             counts[kind] = counts.get(kind, 0) + 1
-            if kind in ("crossing", "occupancy"):
-                errs = validate_payload.validate(kind, payload) if isinstance(payload, dict) \
+            stats = by_kind.setdefault(kind, {"count": 0, "invalid": 0})
+            stats["count"] += 1
+            if kind in VALIDATOR_KINDS:
+                errs = validate_payload.validate(VALIDATOR_KINDS[kind], payload) \
+                    if isinstance(payload, dict) \
                     else ["payload 不是 object"]
+                if errs:
+                    stats["invalid"] += 1
                 for err in errs:
                     problems.append(f"{label}: {kind} 校验失败: {err}")
                     invalid += 1
             elif kind == "status":
                 before = len(problems)
                 _check_status_payload(payload, problems, label)
-                invalid += len(problems) - before
+                row_invalid = len(problems) - before
+                invalid += row_invalid
+                stats["invalid"] += bool(row_invalid)
             elif kind in ("ack",):
                 pass  # vb.ack/1 属基座，这里不校验
             else:
-                warnings.append(f"{label}: 未识别的 topic kind {kind!r}，跳过校验")
-    return {"topics": counts, "invalid": invalid}
+                warning = f"{label}: 未识别的 topic kind {kind!r}，跳过校验"
+                warnings.append(warning)
+                problems.append(f"{label}: 未识别的 topic kind {kind!r}")
+                invalid += 1
+                stats["invalid"] += 1
+    return {"topics": counts, "by_kind": by_kind, "invalid": invalid}
 
 
 def run(platform: str, healthz: str, dump: str, minutes: float, min_fps: float,

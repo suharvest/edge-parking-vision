@@ -1,0 +1,66 @@
+{
+ "set": "evaluation/data/plate_e2e/eval_set.jsonl",
+ "rec": "models/plate_rec_cn_96x32.onnx",
+ "summary": {
+  "green": {
+   "n": 1000,
+   "quad_exact": 0.895,
+   "axis_gt_exact": 0.586
+  },
+  "held_out_both": {
+   "n": 1000,
+   "quad_exact": 0.895,
+   "axis_gt_exact": 0.586
+  },
+  "all": {
+   "n": 3400,
+   "quad_exact": 0.9109,
+   "axis_gt_exact": 0.5182
+  },
+  "base": {
+   "n": 300,
+   "quad_exact": 1.0,
+   "axis_gt_exact": 0.8733
+  },
+  "held_out_det_rec_seen": {
+   "n": 2400,
+   "quad_exact": 0.9175,
+   "axis_gt_exact": 0.49
+  },
+  "db": {
+   "n": 300,
+   "quad_exact": 0.81,
+   "axis_gt_exact": 0.3767
+  },
+  "fn": {
+   "n": 300,
+   "quad_exact": 0.9067,
+   "axis_gt_exact": 0.43
+  },
+  "rotate": {
+   "n": 300,
+   "quad_exact": 0.9533,
+   "axis_gt_exact": 0.1767
+  },
+  "tilt": {
+   "n": 300,
+   "quad_exact": 0.9533,
+   "axis_gt_exact": 0.0833
+  },
+  "weather": {
+   "n": 300,
+   "quad_exact": 0.9867,
+   "axis_gt_exact": 0.82
+  },
+  "challenge": {
+   "n": 300,
+   "quad_exact": 0.87,
+   "axis_gt_exact": 0.6
+  },
+  "blur": {
+   "n": 300,
+   "quad_exact": 0.86,
+   "axis_gt_exact": 0.56
+  }
+ }
+}

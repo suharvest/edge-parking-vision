@@ -26,8 +26,8 @@ services:
       influxdb:
         condition: service_healthy
     environment:
-      # R1124 broker 地址（正式部署：R1124 上 systemd 的 mosquitto，见 §S12）
-      MQTT_HOST: ${MQTT_HOST:-r1124.local}
+      # MQTT broker 地址：broker.local 为占位默认值，按实际 broker 主机名通过 MQTT_HOST 覆盖
+      MQTT_HOST: ${MQTT_HOST:-broker.local}
       MQTT_PORT: ${MQTT_PORT:-1883}
       MQTT_USERNAME: ${MQTT_USERNAME:-viewer}
       MQTT_PASSWORD: ${MQTT_PASSWORD:-viewer}

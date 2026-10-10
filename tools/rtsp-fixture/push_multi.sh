@@ -4,7 +4,7 @@
 #
 # 用法：
 #   bash tools/rtsp-fixture/push_multi.sh <mp4> <N> [host] [base-name]
-#   bash tools/rtsp-fixture/push_multi.sh evaluation/data/fixture/lot_300s.mp4 8 spark cam-b1
+#   bash tools/rtsp-fixture/push_multi.sh evaluation/data/fixture/lot_300s.mp4 8 <rtsp-host> cam-b1
 #
 # 效果：mediamtx 收流（复用/自启容器，同 push.sh），N 个 ffmpeg -re 循环
 # 推同一份视频到 rtsp://<host>:8554/<base>-01 … <base>-NN。Ctrl-C 全停。

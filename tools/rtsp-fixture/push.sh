@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# RTSP 回放推流（规格 §S9）：spark 上 MediaMTX 收流，ffmpeg -re 单次推流（不循环）。
+# RTSP 回放推流（规格 §S9）：GPU x86 工作站上 MediaMTX 收流，ffmpeg -re 单次推流（不循环）。
 #
 # 用法：
-#   bash tools/rtsp-fixture/push.sh evaluation/data/fixture/gate_120s.mp4 ep-gate [spark-host]
+#   bash tools/rtsp-fixture/push.sh evaluation/data/fixture/gate_120s.mp4 ep-gate [rtsp-host]
 #   LOOP=1 bash tools/rtsp-fixture/push.sh tools/rtsp-fixture/truth_line.mp4 ep-truth
 #
 # 依赖：docker（mediamtx 容器）、本机 ffmpeg。

@@ -1,6 +1,6 @@
 """CCPD 文件名解析测试（NRD-3 §7 / §8.1 P4）。
 
-3 个样例均为 spark 上 CCPD2020 ccpd_green/train 的真实文件名（2026-10 提取）。
+3 个样例均为 GPU x86 工作站上 CCPD2020 ccpd_green/train 的真实文件名（2026-10 提取）。
 字符索引表对全量 11776 张的实证核对见 training/ccpd_to_coco.py 模块 docstring。
 """
 

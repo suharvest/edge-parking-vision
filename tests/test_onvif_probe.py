@@ -31,7 +31,7 @@ MATCH_XML = b"""<?xml version="1.0" encoding="utf-8"?>
     <wsa:EndpointReference><wsa:Address>urn:uuid:81386d1e-4714-4e7c-970a-612d190b0208</wsa:Address></wsa:EndpointReference>
     <d:Types>dn:NetworkVideoTransmitter tds:Device</d:Types>
     <d:Scopes>onvif://www.onvif.org/type/video_encoder onvif://www.onvif.org/name/IPC</d:Scopes>
-    <d:XAddrs>http://192.168.1.64:8000/onvif/device_service http://[fe80::1]:8000/onvif/device_service</d:XAddrs>
+    <d:XAddrs>http://192.0.2.64:8000/onvif/device_service http://[fe80::1]:8000/onvif/device_service</d:XAddrs>
     <d:MetadataVersion>10</d:MetadataVersion>
    </d:ProbeMatch>
   </d:ProbeMatches>
@@ -52,7 +52,7 @@ def test_parse_probe_matches_extracts_xaddrs():
     devs = onvif_probe.parse_probe_matches(MATCH_XML)
     assert len(devs) == 1
     d = devs[0]
-    assert d["xaddrs"] == ["http://192.168.1.64:8000/onvif/device_service",
+    assert d["xaddrs"] == ["http://192.0.2.64:8000/onvif/device_service",
                            "http://[fe80::1]:8000/onvif/device_service"]
     assert "NetworkVideoTransmitter" in d["types"]
     assert "video_encoder" in d["scopes"]
@@ -91,7 +91,7 @@ def test_probe_loopback_dedup():
         devs = onvif_probe.probe(0.4, mcast_group="127.0.0.1",
                                  mcast_port=1, send_from=("127.0.0.1", port))
         assert len(devs) == 1                   # 去重后只剩 1 台
-        assert devs[0]["xaddrs"][0].startswith("http://192.168.1.64")
+        assert devs[0]["xaddrs"][0].startswith("http://192.0.2.64")
     finally:
         stop.set()
         t.join(timeout=1)
@@ -121,4 +121,4 @@ def test_main_json_output(capsys, monkeypatch):
     assert onvif_probe.main(["--timeout", "1", "--json"]) == 0
     import json
     out = json.loads(capsys.readouterr().out)
-    assert out[0]["xaddrs"][0].startswith("http://192.168.1.64")
+    assert out[0]["xaddrs"][0].startswith("http://192.0.2.64")

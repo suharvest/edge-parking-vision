@@ -38,7 +38,6 @@ def _load_charset_cn() -> list[str]:
     """复用 core-py/core_parking/plate/charset.py（只读）。工作区副本优先。"""
     candidates = [
         Path(__file__).resolve().parents[1] / "core-py",
-        Path("/home/harvest/project/edge-parking-vision/core-py"),
     ]
     for p in candidates:
         if (p / "core_parking" / "plate" / "charset.py").exists():

@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+chmod 0755 /etc/init.d/K92edge-parking-plate /opt/vb/bin/vb-runtime /opt/vb/python/bin/python3.11
+mkdir -p /userdata/local/models /var/lib/edge-parking /var/log
+exit 0
