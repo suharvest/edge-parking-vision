@@ -2,6 +2,7 @@
 # Build thin overlay images: published nrd-parking-{jetson,rk} base + core_parking files from SRC_COMMIT.
 #
 # Usage: tools/build_overlay_images.sh <src_commit> <new_tag> [workdir]
+#   PREFLIGHT_ONLY=1 stops after the file-set check (no docker calls).
 #   e.g. tools/build_overlay_images.sh <commit> 20261009b
 #
 # BASE_IMAGE comes from platforms/docker/overlay/Dockerfile.<plat> (pinned by digest);
@@ -28,9 +29,13 @@ PATCH_FROM=${PATCH_FROM:-f94d37f}   # committed core_parking state inside the 20
 BASE_DIRTY="http_app.py config.py envelope.py transport.py slots/app.py slots/hooks_slots.py"
 
 REPLACE=""; PATCH=""
-for f in $(git -C "$REPO" diff --name-only "$PATCH_FROM" "$SRC_COMMIT" -- core-py pyproject.toml uv.lock platforms/docker/Dockerfile); do
+for f in $(git -C "$REPO" diff --name-only "$PATCH_FROM" "$SRC_COMMIT" -- core-py pyproject.toml uv.lock platforms/docker/Dockerfile third_party/vision_base); do
   case "$f" in
     core-py/core_parking/*) rel=${f#core-py/core_parking/} ;;
+    # Packaging files and the vendored vision_base are not part of the overlay:
+    # the published base image already carries its own vision_base under /opt/vb/py.
+    pyproject.toml|uv.lock|platforms/docker/Dockerfile|third_party/vision_base/*)
+      echo "skip (not carried by overlay): $f" >&2; continue ;;
     *) echo "unexpected change outside core_parking: $f" >&2; exit 2 ;;
   esac
   [ -n "$(git -C "$REPO" ls-tree "$SRC_COMMIT" -- "$f")" ] || { echo "file removed in src: $f" >&2; exit 2; }
@@ -38,6 +43,7 @@ for f in $(git -C "$REPO" diff --name-only "$PATCH_FROM" "$SRC_COMMIT" -- core-p
 done
 [ -n "$REPLACE$PATCH" ] || { echo "no core_parking change in $PATCH_FROM..$SRC_COMMIT" >&2; exit 2; }
 echo "REPLACE:$REPLACE"; echo "PATCH:$PATCH"
+[ -z "${PREFLIGHT_ONLY:-}" ] || exit 0
 
 mkdir -p "$WORK/src" "$WORK/from"
 git -C "$REPO" archive "$SRC_COMMIT" core-py/core_parking | tar -x -C "$WORK/src"
