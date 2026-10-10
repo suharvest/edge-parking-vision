@@ -4,7 +4,7 @@
 name = "edge-parking-vision"
 version = "0.1.0"
 description = "Edge parking vision (counting / plate / slots) on a shared vision base"
-readme = { text = "See LICENSES.md and contracts/ for the MQTT event contracts.", content-type = "text/plain" }
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = []
 
