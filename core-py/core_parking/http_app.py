@@ -125,6 +125,8 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._get_config_slots()
             if u.path.startswith("/snapshot/") and u.path.endswith(".jpg"):
                 return self._get_snapshot_jpg(u.path)
+            if u.path.startswith("/snapshots/") and u.path.endswith(".jpg"):
+                return self._get_plate_snapshot_jpg(u.path)
         except Exception:  # noqa: BLE001
             log.exception("GET %s failed", u.path)
             return self._error(500, "internal error")
@@ -204,6 +206,44 @@ class _Handler(BaseHTTPRequestHandler):
         if ctx is None:
             return self._error(404, f"no stream: {sid}")
         self._send_snapshot(ctx, sid)
+
+    def _get_plate_snapshot_jpg(self, path: str) -> None:
+        raw = path[len("/snapshots/"):-len(".jpg")]
+        parts = raw.split("/")
+        if len(parts) == 2:
+            camera_id, seq_text = parts
+            if not camera_id or "/" in camera_id:
+                return self._error(404, "invalid snapshot camera")
+        elif len(parts) == 1:
+            camera_id, seq_text = None, parts[0]
+        else:
+            return self._error(404, "invalid snapshot path")
+        try:
+            seq = int(seq_text)
+        except ValueError:
+            return self._error(404, "invalid snapshot sequence")
+        if seq < 0 or str(seq) != seq_text:
+            return self._error(404, "invalid snapshot sequence")
+        owner = getattr(self.app, "plate_hooks", None)
+        if owner is None:
+            owner = getattr(self.app, "hooks", None)
+        if owner is None and callable(getattr(self.app, "snapshot_path", None)):
+            owner = self.app
+        getter = getattr(owner, "snapshot_path", None)
+        if callable(getter):
+            try:
+                path_obj = getter(seq, camera_id)
+            except TypeError:
+                path_obj = getter(seq)
+        else:
+            path_obj = None
+        if path_obj is None:
+            return self._error(404, "snapshot not found")
+        try:
+            data = Path(path_obj).read_bytes()
+        except OSError:
+            return self._error(404, "snapshot not found")
+        self._send(200, data, "image/jpeg")
 
     def _get_config_slots(self) -> None:
         fn = getattr(self.app, "get_slots_config", None)

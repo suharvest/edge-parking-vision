@@ -34,8 +34,10 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from ..classes import CLASS_IDS
+from ..envelope import SeqAllocator
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +89,7 @@ class SlotsOptions:
     @classmethod
     def from_dict(cls, d: dict) -> "SlotsOptions":
         d = dict(d or {})
+        coverage = dict(d.get("slot_coverage") or {})
         slots = {str(k): [dict(s) for s in v] for k, v in (d.get("slots") or {}).items()}
         for stream_id, lst in slots.items():
             ids = [s.get("id") for s in lst]
@@ -98,10 +101,10 @@ class SlotsOptions:
         opt = cls(
             slots=slots,
             unknown_after_s=float(d.get("unknown_after_s", 10.0)),
-            occupied_ratio=float(d.get("occupied_ratio", 0.30)),
-            free_ratio=float(d.get("free_ratio", 0.20)),
-            hold_s=float(d.get("hold_s", 3.0)),
-            free_hold_s=float(d.get("free_hold_s", 5.0)),
+            occupied_ratio=float(coverage.get("occupied_ratio", d.get("occupied_ratio", 0.30))),
+            free_ratio=float(coverage.get("free_ratio", d.get("free_ratio", 0.20))),
+            hold_s=float(coverage.get("hold_s", d.get("hold_s", 3.0))),
+            free_hold_s=float(coverage.get("free_hold_s", d.get("free_hold_s", 5.0))),
         )
         if opt.unknown_after_s <= 0:
             raise ValueError("unknown_after_s must be > 0")
@@ -143,8 +146,13 @@ class SlotHooks:
         self.slots_opt = SlotsOptions()
         self.classes: tuple[int, ...] = CLASS_IDS
         self.tx = None               # 发布者（C2 SpoolPublisher；测试注入 fake）
+        self._owns_tx = False
         self.tick_s = 1.0            # 断流检查周期（§6.2：1 s 定时线程）
         self.now_ms = lambda: int(time.time() * 1000)  # 测试注入可控时钟
+        self.now_mono_ms = lambda: int(time.monotonic() * 1000)
+        self._wake = threading.Event()
+        self._streams_lock = threading.RLock()
+        self._deadlines_mono_ms: dict[str, int] = {}
         self._streams: dict[str, object] = {}
         self._stop = threading.Event()
         self._timer: threading.Thread | None = None
@@ -155,23 +163,43 @@ class SlotHooks:
         self.options = dict(options or {})
         self.device_id = device_id
         self.slots_opt = SlotsOptions.from_dict(self.options)
-        self.classes = tuple(int(c) for c in self.options.get("classes", CLASS_IDS))
+        coverage = dict(self.options.get("slot_coverage") or {})
+        classes = coverage.get("classes", self.options.get("classes", CLASS_IDS))
+        self.classes = tuple(int(c) for c in classes)
         if self.tx is None:
             self.tx = self._make_default_tx()
+            self._owns_tx = True
+            self.tx.start()
         self._stop.clear()
+        self._wake.clear()
         self._timer = threading.Thread(target=self._tick_loop,
                                        name="parking-slots-tick", daemon=True)
         self._timer.start()
 
     def _make_default_tx(self):
         from ..transport import SpoolPublisher  # 惰性 import：P1 测试注入 self.tx
-        return SpoolPublisher.from_options(self.options, self.device_id)
+        spool = dict(self.options.get("spool") or {})
+        state_dir = self.options.get("state_dir", "state")
+        return SpoolPublisher(
+            dict(self.options["mqtt"]),
+            client_id=f"{self.options['site_id']}-{self.device_id}-app",
+            site_id=self.options["site_id"],
+            spool_path=Path(state_dir) / "spool.jsonl",
+            max_events=int(spool.get("max_events", 50000)),
+        )
 
     def close(self) -> None:
         self._stop.set()
+        self._wake.set()
         if self._timer is not None:
             self._timer.join(timeout=2.0)
             self._timer = None
+        if self._owns_tx:
+            close = getattr(self.tx, "close", None)
+            if callable(close):
+                close()
+            self.tx = None
+            self._owns_tx = False
 
     # ------------------------------------------------------------------ AppHooks
 
@@ -187,19 +215,35 @@ class SlotHooks:
         return []
 
     def on_stream_added(self, ctx) -> None:
-        now = self.now_ms()
-        ctx.state["slots"] = {s["id"]: _slot_entry(now)
-                              for s in self.slots_opt.slots.get(ctx.stream_id, [])}
-        ctx.state["stream_ok"] = True
-        ctx.state["down_since"] = None
-        ctx.state["saved_slots"] = None
-        self._streams[ctx.stream_id] = ctx
+        with self._streams_lock:
+            now = self.now_ms()
+            ctx.state["seq"] = SeqAllocator(Path(self.options.get("state_dir", "state")) /
+                                             ctx.stream_id)
+            ctx.state["slots"] = {s["id"]: _slot_entry(now)
+                                  for s in self.slots_opt.slots.get(ctx.stream_id, [])}
+            ctx.state["stream_ok"] = True
+            ctx.state["down_since"] = None
+            ctx.state["saved_slots"] = None
+            self._streams[ctx.stream_id] = ctx
+            self._deadlines_mono_ms.pop(ctx.stream_id, None)
+        self._wake.set()
 
     def on_stream_removed(self, ctx) -> None:
-        self._streams.pop(ctx.stream_id, None)
+        with self._streams_lock:
+            if self._streams.get(ctx.stream_id) is not ctx:
+                return
+            self._streams.pop(ctx.stream_id, None)
+            self._deadlines_mono_ms.pop(ctx.stream_id, None)
+        self._wake.set()
 
     def on_event(self, ctx, ev) -> list:
         if ev.type != "slot_change":
+            return []
+        with self._streams_lock:
+            return self._on_event_locked(ctx, ev)
+
+    def _on_event_locked(self, ctx, ev) -> list:
+        if self._streams.get(ctx.stream_id) is not ctx:
             return []
         slots = ctx.state["slots"]
         slot_id = ev.fields["slot_id"]
@@ -217,18 +261,25 @@ class SlotHooks:
 
     def on_stream_state(self, ctx, state: str, error=None) -> list:
         """NRD-2 §S13 B1（基座 M4.1b 未实现；P1 由测试直接调用，fake 顶替）。"""
-        if state in ("reconnecting", "error"):
-            if ctx.state["down_since"] is None:
-                ctx.state["down_since"] = self.now_ms()
-        elif state == "running":
-            if not ctx.state["stream_ok"]:
-                saved = ctx.state.get("saved_slots")
-                if saved is not None:
-                    ctx.state["slots"] = saved
-                    ctx.state["saved_slots"] = None
-            ctx.state["down_since"] = None
-            ctx.state["stream_ok"] = True
-            self.publish_slots(ctx, changed=[], ts=self.now_ms())
+        with self._streams_lock:
+            if self._streams.get(ctx.stream_id) is not ctx:
+                return []
+            if state in ("reconnecting", "error"):
+                if ctx.state["down_since"] is None:
+                    ctx.state["down_since"] = self.now_ms()
+                    self._deadlines_mono_ms[ctx.stream_id] = (
+                        self.now_mono_ms() + int(self.slots_opt.unknown_after_s * 1000))
+            elif state == "running":
+                if not ctx.state["stream_ok"]:
+                    saved = ctx.state.get("saved_slots")
+                    if saved is not None:
+                        ctx.state["slots"] = saved
+                        ctx.state["saved_slots"] = None
+                ctx.state["down_since"] = None
+                ctx.state["stream_ok"] = True
+                self._deadlines_mono_ms.pop(ctx.stream_id, None)
+                self.publish_slots(ctx, changed=[], ts=self.now_ms())
+        self._wake.set()
         return []
 
     # ------------------------------------------------------------------ 车位增删
@@ -247,41 +298,64 @@ class SlotHooks:
         for s in new_slots:
             if not s.get("id"):
                 raise ValueError(f"slot entry missing 'id': {s!r}")
-        ctx = self._streams.get(stream_id)
-        if ctx is None:
-            raise KeyError(f"unknown stream {stream_id!r}")
-        self.slots_opt.slots[stream_id] = [dict(s) for s in new_slots]
-        ctx.configure_analyzer("slot_coverage",
-                               slot_coverage_config(self.slots_opt, stream_id,
-                                                    self.classes))
-        now = self.now_ms()
-        old = ctx.state["slots"]
-        ctx.state["slots"] = {s["id"]: old.get(s["id"], _slot_entry(now))
-                              for s in new_slots}
-        self.publish_slots(ctx, changed=[], ts=now)
+        with self._streams_lock:
+            ctx = self._streams.get(stream_id)
+            if ctx is None:
+                raise KeyError(f"unknown stream {stream_id!r}")
+            self.slots_opt.slots[stream_id] = [dict(s) for s in new_slots]
+            ctx.configure_analyzer("slot_coverage",
+                                   slot_coverage_config(self.slots_opt, stream_id,
+                                                        self.classes))
+            now = self.now_ms()
+            old = ctx.state["slots"]
+            ctx.state["slots"] = {s["id"]: old.get(s["id"], _slot_entry(now))
+                                  for s in new_slots}
+            self.publish_slots(ctx, changed=[], ts=now)
+        self._wake.set()
         return ctx.state["slots"]
 
     # ------------------------------------------------------------------ 断流计时
 
+    def _next_deadline_wait_s(self) -> float:
+        with self._streams_lock:
+            active_deadlines = [deadline for sid, deadline in self._deadlines_mono_ms.items()
+                                if self._streams.get(sid) is not None]
+            if not active_deadlines:
+                return self.tick_s
+            remaining = min(active_deadlines) - self.now_mono_ms()
+            return max(0.0, remaining / 1000.0)
+
     def _tick_loop(self) -> None:
-        while not self._stop.wait(self.tick_s):
+        while not self._stop.is_set():
+            self._wake.wait(self._next_deadline_wait_s())
+            self._wake.clear()
+            if self._stop.is_set():
+                break
             try:
-                self._tick(self.now_ms())
+                self._tick(self.now_ms(), self.now_mono_ms())
             except Exception:  # 定时线程不能死；错误留日志
                 log.exception("slots tick failed")
 
-    def _tick(self, now_ms: int) -> None:
-        for ctx in list(self._streams.values()):
-            down_since = ctx.state.get("down_since")
-            if down_since is None or not ctx.state.get("stream_ok", True):
-                continue
-            if now_ms - down_since >= self.slots_opt.unknown_after_s * 1000:
+    def _tick(self, now_ms: int, mono_ms: int | None = None) -> None:
+        with self._streams_lock:
+            for ctx in list(self._streams.values()):
+                if self._streams.get(ctx.stream_id) is not ctx:
+                    continue
+                down_since = ctx.state.get("down_since")
+                if down_since is None or not ctx.state.get("stream_ok", True):
+                    continue
+                deadline = self._deadlines_mono_ms.get(ctx.stream_id)
+                expired = ((mono_ms is not None and deadline is not None and mono_ms >= deadline) or
+                           (mono_ms is None and now_ms - down_since >= self.slots_opt.unknown_after_s * 1000))
+                if not expired:
+                    continue
                 # 保存最后已知状态（恢复 running 时回滚，§6.2）
                 ctx.state["saved_slots"] = copy.deepcopy(ctx.state["slots"])
                 now = self.now_ms()
                 for entry in ctx.state["slots"].values():
                     entry.update(state="unknown", since=now)
                 ctx.state["stream_ok"] = False
+                self._deadlines_mono_ms.pop(ctx.stream_id, None)
                 self.publish_slots(ctx, changed=[], ts=now)
 
     # ------------------------------------------------------------------ 发布
@@ -303,10 +377,24 @@ class SlotHooks:
 
     def health(self) -> dict:  # §S13 B2：基座放入 /healthz 的 app 子对象
         tx = self.tx
+        transport_health = {}
+        health_fn = getattr(tx, "health", None)
+        if callable(health_fn):
+            try:
+                reported = health_fn()
+            except Exception:  # keep legacy/fake attribute fallback below
+                reported = {}
+            if isinstance(reported, dict):
+                transport_health = reported
+        with self._streams_lock:
+            streams_ok = {sid: bool(ctx.state.get("stream_ok", True))
+                          for sid, ctx in self._streams.items()}
         return {
-            "spool_depth": getattr(tx, "spool_depth", None),
-            "spool_overflow": getattr(tx, "spool_overflow", None),
-            "mqtt_app_connected": getattr(tx, "mqtt_app_connected", None),
-            "streams_ok": {sid: bool(ctx.state.get("stream_ok", True))
-                           for sid, ctx in self._streams.items()},
+            "spool_depth": transport_health.get(
+                "spool_depth", getattr(tx, "spool_depth", None)),
+            "spool_overflow": transport_health.get(
+                "spool_overflow", getattr(tx, "spool_overflow", None)),
+            "mqtt_app_connected": transport_health.get(
+                "mqtt_app_connected", getattr(tx, "mqtt_app_connected", None)),
+            "streams_ok": streams_ok,
         }

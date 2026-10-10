@@ -1,0 +1,136 @@
+#!/bin/sh
+set -eu
+NAME=edge-parking-plate
+PIDFILE=${PIDFILE:-/var/run/$NAME.pid}
+LOCKDIR=${LOCKDIR:-/var/run/$NAME.lock}
+LEGACY=${LEGACY:-/etc/edge-parking-plate.conf}
+TEMPLATE=${TEMPLATE:-/etc/edge-parking-plate/parking.vb.config.template.json}
+CONFIG=${CONFIG:-/etc/edge-parking-plate/parking.vb.config.json}
+PYTHON=${PYTHON:-/opt/vb/python/bin/python3.11}
+LOGFILE=${LOGFILE:-/var/log/$NAME.log}
+LOCK_ACQUIRED=0
+LOCK_INODE=
+LOCK_OWNER_START=
+export PYTHONPATH=${PYTHONPATH:-/opt/vb/py:/opt/edge-parking}
+proc_start() { awk '{sub(/^.*\) /, ""); print $20}' "/proc/$1/stat" 2>/dev/null; }
+proc_state() { awk '{sub(/^.*\) /, ""); print $1}' "/proc/$1/stat" 2>/dev/null; }
+lock_release() {
+    [ "$LOCK_ACQUIRED" = 1 ] || return 0
+    [ -d "$LOCKDIR" ] || return 0
+    [ "$(stat -c %i "$LOCKDIR" 2>/dev/null || true)" = "$LOCK_INODE" ] || return 0
+    owner=$(cat "$LOCKDIR/owner" 2>/dev/null || true)
+    [ "$owner" = "$$ $LOCK_OWNER_START $LOCK_INODE" ] || return 0
+    rm -f "$LOCKDIR/owner"
+    rmdir "$LOCKDIR" 2>/dev/null || true
+    LOCK_ACQUIRED=0
+}
+lock_acquire() {
+    if mkdir "$LOCKDIR" 2>/dev/null; then
+        LOCK_INODE=$(stat -c %i "$LOCKDIR")
+        LOCK_OWNER_START=$(proc_start $$)
+        tmp="$LOCKDIR/owner.tmp.$$"
+        printf '%s\n' "$$ $LOCK_OWNER_START $LOCK_INODE" > "$tmp"
+        mv "$tmp" "$LOCKDIR/owner"
+        LOCK_ACQUIRED=1
+        trap lock_release EXIT
+        return 0
+    fi
+    [ -d "$LOCKDIR" ] || { echo "$NAME: lifecycle lock creation failed" >&2; return 1; }
+    inode=$(stat -c %i "$LOCKDIR" 2>/dev/null || true)
+    owner=$(cat "$LOCKDIR/owner" 2>/dev/null || true)
+    set -- $owner
+    [ "$#" -eq 3 ] || { echo "$NAME: lock owner metadata unavailable; refusing reclaim" >&2; return 1; }
+    opid=$1; ostart=$2; oinode=$3
+    [ "$oinode" = "$inode" ] || { echo "$NAME: lock inode changed; refusing reclaim" >&2; return 1; }
+    [ -r "/proc/$opid/stat" ] && [ "$(proc_start "$opid")" = "$ostart" ] && { echo "$NAME: lifecycle busy" >&2; return 1; }
+    inode2=$(stat -c %i "$LOCKDIR" 2>/dev/null || true)
+    owner2=$(cat "$LOCKDIR/owner" 2>/dev/null || true)
+    [ "$inode2" = "$inode" ] && [ "$owner2" = "$owner" ] || { echo "$NAME: lock owner changed; refusing reclaim" >&2; return 1; }
+    rm -f "$LOCKDIR/owner"
+    rmdir "$LOCKDIR" 2>/dev/null || { echo "$NAME: dead lock is not removable; refusing reclaim" >&2; return 1; }
+    lock_acquire
+}
+owned() {
+    p=$1; [ -r "/proc/$p/stat" ] && [ -r "/proc/$p/exe" ] || return 1
+    [ "$(proc_start "$p")" = "$2" ] || return 1
+    [ "$(readlink "/proc/$p/exe")" = "$PYTHON" ] || return 1
+    tr '\000' ' ' < "/proc/$p/cmdline" | grep -F -- "vision_base.main --config $CONFIG" >/dev/null
+}
+read_meta() { [ -r "$PIDFILE" ] || return 1; set -- $(cat "$PIDFILE"); [ "$#" -eq 2 ] || return 1; PID=$1; START=$2; }
+render_config() {
+    [ -f "$TEMPLATE" ] || { echo "$NAME: missing template" >&2; return 1; }
+    "$PYTHON" - "$LEGACY" "$TEMPLATE" "$CONFIG.tmp.$$" "$CONFIG" <<'PY'
+import json, os, re, sys
+legacy, template, output, final = sys.argv[1:]
+values = {'SITE_ID':'edge-parking-2002','CAMERA_ID':'camera-1','MQTT_HOST':'r1124.local','MQTT_PORT':'1883','PLATE_MODE':'full'}
+if os.path.exists(legacy):
+    for number, raw in enumerate(open(legacy, encoding='utf-8'), 1):
+        line = raw.rstrip('\n')
+        if not line or line.lstrip().startswith('#'): continue
+        if '=' not in line: raise SystemExit(f'legacy config line {number}: expected key=value')
+        key, value = line.split('=', 1)
+        if key not in values: raise SystemExit(f'legacy config line {number}: unknown key {key}')
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in value): raise SystemExit(f'legacy config line {number}: control character')
+        values[key] = value
+if not re.fullmatch(r'[a-z0-9-]{1,32}', values['SITE_ID']): raise SystemExit('invalid SITE_ID')
+if not re.fullmatch(r'[a-z0-9-]{1,32}', values['CAMERA_ID']): raise SystemExit('invalid CAMERA_ID')
+if not values['MQTT_HOST'] or any(ord(ch) < 32 or ord(ch) == 127 for ch in values['MQTT_HOST']): raise SystemExit('invalid MQTT_HOST')
+if not re.fullmatch(r'[0-9]+', values['MQTT_PORT']) or not 1 <= int(values['MQTT_PORT']) <= 65535: raise SystemExit('invalid MQTT_PORT')
+if values['PLATE_MODE'] != 'full': raise SystemExit('unsupported PLATE_MODE; only full is implemented')
+data = json.loads(open(template, encoding='utf-8').read())
+def replace(value):
+    if isinstance(value, str):
+        for key, item in values.items(): value = value.replace('__'+key+'__', item)
+    elif isinstance(value, list): return [replace(item) for item in value]
+    elif isinstance(value, dict): return {key: replace(item) for key, item in value.items()}
+    return value
+data = replace(data)
+data['mqtt']['port'] = int(values['MQTT_PORT'])
+data['app']['options']['mqtt']['port'] = int(values['MQTT_PORT'])
+data['app']['options']['plate']['mode'] = values['PLATE_MODE']
+with open(output, 'w', encoding='utf-8') as fh:
+    json.dump(data, fh, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    fh.write('\n'); fh.flush(); os.fsync(fh.fileno())
+os.replace(output, final)
+dirfd = os.open(os.path.dirname(final), os.O_RDONLY)
+os.fsync(dirfd); os.close(dirfd)
+PY
+}
+start() {
+    if [ -f "$PIDFILE" ] && read_meta && owned "$PID" "$START"; then
+        echo "$NAME already running; config unchanged, restart required for new parameters" >&2; return 0
+    fi
+    if [ -f "$PIDFILE" ]; then echo "$NAME: refusing stale or foreign pidfile" >&2; return 1; fi
+    render_config || return $?
+    "$PYTHON" -m vision_base.main --config "$CONFIG" > "$LOGFILE" 2>&1 &
+    pid=$!; i=0
+    while [ $i -lt 20 ]; do
+        if [ -r "/proc/$pid/stat" ] && owned "$pid" "$(proc_start "$pid")"; then
+            start_time=$(proc_start "$pid")
+            sleep 0.1
+            if owned "$pid" "$start_time"; then
+                printf '%s %s\n' "$pid" "$start_time" > "$PIDFILE"; return 0
+            fi
+            echo "$NAME: child exited before ownership was established" >&2
+            return 1
+        fi
+        [ "$(proc_state "$pid")" = Z ] && { echo "$NAME: child exited before ownership was established" >&2; return 1; }
+        kill -0 "$pid" 2>/dev/null || { echo "$NAME: child exited before ownership was established" >&2; return 1; }
+        sleep 0.1; i=$((i + 1))
+    done
+    echo "$NAME: child ownership check timed out; PID $pid was not signalled" >&2; return 1
+}
+stop() {
+    read_meta || return 0
+    if ! owned "$PID" "$START"; then echo "$NAME: refusing to signal foreign pid $PID" >&2; return 1; fi
+    kill "$PID" 2>/dev/null || true
+    i=0; while [ $i -lt 20 ] && owned "$PID" "$START"; do sleep 0.5; i=$((i + 1)); done
+    if owned "$PID" "$START"; then echo "$NAME: stop timeout" >&2; return 1; fi
+    rm -f "$PIDFILE"
+}
+status() { read_meta && owned "$PID" "$START"; }
+lock_acquire
+rc=0
+case "${1:-}" in start) start || rc=$?;; stop) stop || rc=$?;; status) status || rc=$?;; restart) stop && start || rc=$?;; *) echo "usage: $0 {start|stop|status|restart}" >&2; rc=2;; esac
+lock_release
+exit "$rc"

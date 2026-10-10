@@ -1,0 +1,5 @@
+{"mono_s":100.0,"track_id":1,"seq":1,"wall_ms":1000,"text":"粤B12345","emit":true}
+{"mono_s":129.999,"track_id":2,"seq":2,"wall_ms":2000,"text":"粤B12345","emit":false}
+{"mono_s":130.0,"track_id":3,"seq":3,"wall_ms":3000,"text":"粤B12345","emit":true}
+{"mono_s":159.999,"track_id":4,"seq":4,"wall_ms":4000,"text":"粤B12345","emit":false}
+{"mono_s":160.0,"track_id":5,"seq":5,"wall_ms":5000,"text":"粤B12345","emit":true}

@@ -32,7 +32,8 @@ def _check_id(name: str, value: str) -> None:
 
 
 def build_envelope(kind: str, *, site_id: str, camera_id: str, ts: int, seq: int,
-                   body: dict, replayed: bool = False) -> dict:
+                   body: dict, replayed: bool = False,
+                   event_id: str | None = None) -> dict:
     """生成公共信封 + 事件 body（§S3）。
 
     ``kind`` ∈ crossing | occupancy | plate | plate_crop | gate | slots，
@@ -44,7 +45,7 @@ def build_envelope(kind: str, *, site_id: str, camera_id: str, ts: int, seq: int
         raise ValueError(f"seq 必须为 >= 0 的整数，得到 {seq!r}")
     env = {
         "schema": f"parking.{kind}/1",
-        "event_id": str(uuid.uuid4()),
+        "event_id": event_id or str(uuid.uuid4()),
         "site_id": site_id,
         "camera_id": camera_id,
         "ts": int(ts),

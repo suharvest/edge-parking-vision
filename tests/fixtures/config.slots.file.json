@@ -1,0 +1,30 @@
+{
+  "schema": "vb.config/1",
+  "device_id": "dev-lot-slots",
+  "backend": {
+    "name": "cpu",
+    "model_path": "models/yolox_tiny_coco_640.onnx",
+    "input_size": [640, 640],
+    "align": "top_left",
+    "score_threshold": 0.30,
+    "nms_threshold": 0.45,
+    "input": {"color_order": "bgr", "divide": 1.0},
+    "decoder": {"type": "yolox", "num_classes": 80, "strides": [8, 16, 32], "grid_center_activation": "none"}
+  },
+  "runtime": {"workers": 1, "max_streams_per_worker": 0, "contexts_per_worker": 1, "publishers_per_process": 1,
+    "publish_queue": 256, "max_streams": 16, "open_timeout_s": 8.0, "reconnect_delay_s": 1.0, "restart_backoff_s": 5.0},
+  "native": {"binary": "__VB_RUNTIME__", "hello_timeout_s": 10.0, "snapshot_ring": 2, "jpeg_quality": 85},
+  "state_dir": "state", "tracker": {"enabled": true, "iou_threshold": 0.2, "dist_threshold": 0.15, "max_misses": 15,
+    "max_lost_s": 1.5, "min_hits": 1, "class_aware": true, "anchor": "bottom_center"}, "analyzers": {"plugins": []},
+  "mqtt": {"host": "localhost", "port": 1883, "client_id": "dev-lot-slots", "username": "dev-lot-slots", "password": "",
+    "tls": false, "ca_file": "", "topic_root": "demo-lot/parking/dev-lot-slots", "status_interval_s": 10},
+  "health": {"host": "127.0.0.1", "port": 18100}, "streams_file": "",
+  "streams": [{"stream_id": "gate-a", "url": "file://__REPO__/tests/fixtures/dev_gate_10s.mp4", "name": "synthetic-interface-fixture",
+    "transport": "tcp", "score_threshold": null, "options": {"max_fps": 1}}],
+  "app": {"name": "edge-parking-slots", "module": "core_parking.slots.hooks_slots:SlotHooks", "options": {
+    "site_id": "demo-lot", "mqtt": {"host": "localhost", "port": 1883, "username": "dev-lot-slots", "password": "", "keepalive_s": 30},
+    "http": {"port": 18101}, "spool": {"max_events": 50000}, "target_fps": 1, "unknown_after_s": 10,
+    "slot_coverage": {"occupied_ratio": 0.30, "free_ratio": 0.20, "hold_s": 3.0, "free_hold_s": 5.0, "classes": [2, 5, 7]},
+    "slots": {"gate-a": [{"id": "A-01", "polygon": [[0.10, 0.50], [0.30, 0.50], [0.30, 0.90], [0.10, 0.90]]}]}
+  }}
+}

@@ -199,6 +199,30 @@ def test_put_config_slots_empty_body_400(app):
     assert status == 400
 
 
+def test_slots_override_is_loaded_after_restart(tmp_path):
+    """The editor's atomic override survives an app restart."""
+    opts = _options(tmp_path)
+    first = SlotsApp()
+    first.tx = RecordingPublisher()
+    first.configure(opts, "dev-1")
+    ctx = FakeStreamContext(stream_id="cam-b1-01")
+    first.on_stream_added(ctx)
+    try:
+        body = {"cam-b1-01": [{"id": "persisted",
+                               "polygon": [[0, 0], [1, 0], [1, 1]]}]}
+        assert first.set_slots(body) == body
+    finally:
+        first.close()
+
+    second = SlotsApp()
+    second.tx = RecordingPublisher()
+    second.configure(opts, "dev-1")
+    try:
+        assert second.get_slots_config() == body
+    finally:
+        second.close()
+
+
 def test_slots_endpoints_404_on_counting_app(tmp_path):
     """counting 预设的 ParkingApp 没有 slots 后端 → 404（不影响既有端点）。"""
     from core_parking.config import ParkingApp
