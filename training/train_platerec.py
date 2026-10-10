@@ -138,17 +138,22 @@ class RecDataset(Dataset):
         self.items = items
         self.char2idx = char2idx
         self.train = train
-        if crop_mode not in {"quad", "axis"}:
+        if crop_mode not in {"quad", "axis", "axisctx"}:
             raise ValueError(f"unknown crop mode: {crop_mode}")
         self.crop_mode = crop_mode
         self.axis_boxes = axis_boxes or []
         self.axis_expand = axis_expand
         self._corners: list[np.ndarray] = []
+        self.ctx_rows: list[dict] = []
+        self.ctx_dir: Path | None = None
+        self.jitter = (0.0, 0.0, 0.0)  # (prob, max center shift / box size, max log-scale)
 
     def __len__(self) -> int:  # noqa: D105
         return len(self.items)
 
     def __getitem__(self, i: int):
+        if self.crop_mode == "axisctx":
+            return self._getitem_ctx(i)
         path, plate = self.items[i]
         img = cv2.imread(path)  # BGR，逐张读取，不预载
         if img is None:
@@ -173,9 +178,67 @@ class RecDataset(Dataset):
         label = torch.tensor([self.char2idx[c] for c in plate], dtype=torch.long)
         return x, label
 
+    def _getitem_ctx(self, i: int):
+        r = self.ctx_rows[i]
+        bgr = cv2.imread(str(self.ctx_dir / r["png"]), cv2.IMREAD_COLOR)
+        if bgr is None:
+            raise FileNotFoundError(r["png"])
+        rgb = bgr[:, :, ::-1]
+        box = [float(v) for v in r["box"]]
+        if self.train and self.jitter[0] > 0 and RNG.random() < self.jitter[0]:
+            box = jitter_box(box, self.jitter[1], self.jitter[2])
+        crop_rgb = axisctx_crop(rgb, box, r["region_xy"], r["frame_wh"], self.axis_expand)
+        if self.train:
+            crop_rgb = augment(np.clip(np.floor(crop_rgb + 0.5), 0, 255).astype(np.uint8))
+        x = torch.from_numpy((crop_rgb.astype(np.float32) / 255.0).transpose(2, 0, 1).copy())
+        label = torch.tensor([self.char2idx[c] for c in r["plate"]], dtype=torch.long)
+        return x, label
+
     def with_corners(self, corners_list: list[np.ndarray]) -> "RecDataset":
         self._corners = corners_list
         return self
+
+
+def jitter_box(box: list[float], shift: float, log_scale: float) -> list[float]:
+    """Perturb a region-space box: centre shift U(-shift, shift)·size, size × exp(U(-ls, ls))."""
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    bw, bh = box[2] - box[0], box[3] - box[1]
+    cx += float(RNG.uniform(-shift, shift)) * bw
+    cy += float(RNG.uniform(-shift, shift)) * bh
+    bw *= math.exp(float(RNG.uniform(-log_scale, log_scale)))
+    bh *= math.exp(float(RNG.uniform(-log_scale, log_scale)))
+    return [cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2]
+
+
+def axisctx_crop(region_rgb: np.ndarray, box: list[float], region_xy, frame_wh,
+                 expand: float) -> np.ndarray:
+    """Runtime stage-2 crop (plate_e2e_eval.expand_box + crop_rec) computed on a saved
+    context region. Box is in region pixels; expansion/clamping use the full frame."""
+    fw, fh = float(frame_wh[0]), float(frame_wh[1])
+    ox, oy = float(region_xy[0]), float(region_xy[1])
+    b = [box[0] + ox, box[1] + oy, box[2] + ox, box[3] + oy]
+    b = [max(0.0, b[0]), max(0.0, b[1]), min(fw, b[2]), min(fh, b[3])]
+    cx, cy = (b[0] + b[2]) / 2 / fw, (b[1] + b[3]) / 2 / fh
+    bw, bh = (b[2] - b[0]) / fw, (b[3] - b[1]) / fh
+    x0, y0 = max(0.0, cx - bw * (0.5 + expand)), max(0.0, cy - bh * (0.5 + expand))
+    x1, y1 = min(1.0, cx + bw * (0.5 + expand)), min(1.0, cy + bh * (0.5 + expand))
+    x0, x1 = x0 * fw - ox, x1 * fw - ox
+    y0, y1 = y0 * fh - oy, y1 * fh - oy
+    rh, rw = region_rgb.shape[:2]
+    ys = _stage2_axis(32, y0, (y1 - y0) / 32, rh)
+    xs = _stage2_axis(96, x0, (x1 - x0) / 96, rw)
+    a = region_rgb.astype(np.float32)
+    rows = a[ys[0]] * (1 - ys[2])[:, None, None] + a[ys[1]] * ys[2][:, None, None]
+    return rows[:, xs[0]] * (1 - xs[2])[None, :, None] + rows[:, xs[1]] * xs[2][None, :, None]
+
+
+def _stage2_axis(n_out: int, start: float, step: float, n_src: int):
+    """cpu_stage2 sampling: half-pixel centres, clamp coordinate, then floor."""
+    s = start + (np.arange(n_out, dtype=np.float32) + 0.5) * step - 0.5
+    s = np.clip(s, 0, n_src - 1)
+    i0 = np.floor(s).astype(np.int64)
+    f = (s - i0).astype(np.float32)
+    return i0, np.minimum(i0 + 1, n_src - 1), f
 
 
 def build_items(manifests: list[str], rec_root: Path, limit: int | None):
@@ -427,7 +490,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", type=Path, default=None)
     ap.add_argument("--init-weights", type=Path, default=None,
                     help="load model weights only; starts fresh optimizer/scheduler")
-    ap.add_argument("--crop-mode", choices=("quad", "axis"), default="quad")
+    ap.add_argument("--crop-mode", choices=("quad", "axis", "axisctx"), default="quad")
+    ap.add_argument("--axisctx-dir", type=Path, default=None,
+                    help="store from gen_platerec_axis_crops.py (rows.jsonl + meta.json + PNGs)")
+    ap.add_argument("--box-jitter-prob", type=float, default=0.8)
+    ap.add_argument("--box-jitter-shift", type=float, default=0.05)
+    ap.add_argument("--box-jitter-log-scale", type=float, default=0.12)
     ap.add_argument("--axis-crop-manifest", type=Path, default=None)
     ap.add_argument("--axis-expand", type=float, default=None)
     ap.add_argument("--max-rss-gb", type=float, default=60.0)
@@ -468,7 +536,29 @@ def main(argv: list[str] | None = None) -> int:
     axis_manifest_sha = None
     detector_model_sha = None
     axis_expand = None
-    if args.crop_mode == "axis":
+    if args.crop_mode == "axisctx":
+        if args.axisctx_dir is None:
+            raise SystemExit("--axisctx-dir is required with --crop-mode axisctx")
+        ctx_meta = json.loads((args.axisctx_dir / "meta.json").read_text(encoding="utf-8"))
+        all_rows = [json.loads(l) for l in (args.axisctx_dir / "rows.jsonl").read_text(
+            encoding="utf-8").splitlines() if l.strip()]
+        rows_tr = [r for r in all_rows if r["split"] == "train"][: args.limit]
+        rows_va = [r for r in all_rows if r["split"] == "val"][: args.val_limit]
+        axis_expand = 0.08 if args.axis_expand is None else float(args.axis_expand)
+        axis_manifest_sha = _sha256_file(args.axisctx_dir / "rows.jsonl")
+        detector_model_sha = ctx_meta["detector_model_sha256"]
+        train_ds = RecDataset([], char2idx, train=True, crop_mode="axisctx", axis_expand=axis_expand)
+        val_ds = RecDataset([], char2idx, train=False, crop_mode="axisctx", axis_expand=axis_expand)
+        for ds, rows in ((train_ds, rows_tr), (val_ds, rows_va)):
+            ds.ctx_rows, ds.ctx_dir = rows, args.axisctx_dir
+            ds.items = [(r["png"], r["plate"]) for r in rows]
+        train_ds.jitter = (args.box_jitter_prob, args.box_jitter_shift, args.box_jitter_log_scale)
+        tr, va = (rows_tr,), (rows_va,)
+        log(f"[axisctx] dir={args.axisctx_dir} rows_sha256={axis_manifest_sha} "
+            f"detector_sha256={detector_model_sha} expand={axis_expand} "
+            f"jitter={train_ds.jitter} stats={ctx_meta.get('stats')} "
+            f"excluded={ctx_meta.get('excluded_by_manifest')}")
+    elif args.crop_mode == "axis":
         if args.axis_crop_manifest is None:
             raise SystemExit("--axis-crop-manifest is required with --crop-mode axis")
         tr = build_axis_items(args.axis_crop_manifest, "train", args.data_root, args.axis_expand, args.limit)

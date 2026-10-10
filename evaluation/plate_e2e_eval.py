@@ -356,6 +356,56 @@ class TrtBackend:
         return self._infer(1, np.transpose(crop_rgb / 255.0, (2, 0, 1))[None])
 
 
+class HailoBackend:
+    """HailoRT 4.21 vstreams, both HEFs on one VDevice with the round-robin scheduler.
+
+    det HEF = the RGB-input surgery model of the 10-08 bundle (UINT8 NHWC RGB 640x640; it
+    is fed the same top-left letterbox canvas as the other backends, not the stretched
+    frame the runtime's hailo_source produces); its 9 outputs (reg 4ch + two sigmoid 1ch
+    maps per stride) are re-assembled into the ONNX [1, 8400, 6] row layout. rec HEF takes
+    UINT8 NHWC RGB 32x96 (/255 folded in) and returns [T=24, C=66]."""
+
+    def __init__(self, det, rec):
+        from hailo_platform import (HEF, ConfigureParams, FormatType, HailoSchedulingAlgorithm,
+                                    HailoStreamInterface, InferVStreams, InputVStreamParams,
+                                    OutputVStreamParams, VDevice)
+        vp = VDevice.create_params()
+        vp.scheduling_algorithm = HailoSchedulingAlgorithm.ROUND_ROBIN
+        self.vd = VDevice(vp)
+        self.pipes, self.ctx = [], []
+        for path in (det, rec):
+            hef = HEF(path)
+            ng = self.vd.configure(hef, ConfigureParams.create_from_hef(
+                hef, interface=HailoStreamInterface.PCIe))[0]
+            ip = InputVStreamParams.make(ng, format_type=FormatType.UINT8)
+            op = OutputVStreamParams.make(ng, format_type=FormatType.FLOAT32)
+            c = InferVStreams(ng, ip, op)
+            self.ctx.append(c)
+            self.pipes.append((c.__enter__(), hef.get_input_vstream_infos()[0].name))
+
+    def _infer(self, k, x):
+        pipe, name = self.pipes[k]
+        return pipe.infer({name: np.ascontiguousarray(x[None], dtype=np.uint8)})
+
+    def run_det(self, canvas_rgb):
+        outs = self._infer(0, np.clip(np.floor(canvas_rgb + 0.5), 0, 255).astype(np.uint8))
+        by = {}
+        for o in outs.values():
+            o = np.asarray(o, np.float32).reshape(np.asarray(o).shape[-3:])  # HWC
+            by.setdefault(o.shape[0], []).append(o)
+        rows = []
+        for h in sorted(by, reverse=True):  # 80, 40, 20 = strides 8, 16, 32
+            reg = [o for o in by[h] if o.shape[2] == 4][0]
+            ones = [o for o in by[h] if o.shape[2] == 1]  # obj, cls: only their product is used
+            rows.append(np.concatenate([reg, ones[0], ones[1]], axis=2).reshape(-1, 6))
+        return np.concatenate(rows)[None]
+
+    def run_rec(self, crop_rgb):
+        out = next(iter(self._infer(1, np.clip(np.floor(crop_rgb + 0.5), 0, 255).astype(np.uint8)).values()))
+        tc = np.asarray(out, np.float32).reshape(-1, len(CHARSET))  # [T, C]
+        return tc.T[None, :, None, :]  # ONNX layout [1, C, 1, T]
+
+
 # ---------------------------------------------------------------- pipeline
 def run_frame(be, img):
     h, w = img.shape[:2]
@@ -451,7 +501,7 @@ def summarize(results):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--set", type=Path, required=True, help="JSONL from plate_e2e_build_set.py")
-    ap.add_argument("--backend", choices=("onnx", "rknn", "trt"), default="onnx")
+    ap.add_argument("--backend", choices=("onnx", "rknn", "trt", "hailo"), default="onnx")
     ap.add_argument("--det", required=True)
     ap.add_argument("--rec", required=True)
     ap.add_argument("--path-prefix", default=None,
@@ -476,7 +526,8 @@ def main(argv=None) -> int:
     if args.path_prefix:
         for r in rows:
             r["path"] = f"{args.path_prefix}/{r['id']}.rgbz"
-    be = {"onnx": OnnxBackend, "rknn": RknnBackend, "trt": TrtBackend}[args.backend](args.det, args.rec)
+    be = {"onnx": OnnxBackend, "rknn": RknnBackend, "trt": TrtBackend,
+          "hailo": HailoBackend}[args.backend](args.det, args.rec)
     t0 = time.time()
     res = evaluate(rows, be, args.vote_frames, args.seed)
     summ = summarize(res)

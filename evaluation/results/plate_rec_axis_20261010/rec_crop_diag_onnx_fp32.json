@@ -1,0 +1,66 @@
+{
+ "set": "evaluation/data/plate_e2e/eval_set.jsonl",
+ "rec": "/home/harvest/nrd-parking-run/plate-rec-axis-20261010/onnx/plate_rec_cn_96x32.onnx",
+ "summary": {
+  "green": {
+   "n": 1000,
+   "quad_exact": 0.828,
+   "axis_gt_exact": 0.8
+  },
+  "held_out_both": {
+   "n": 1000,
+   "quad_exact": 0.828,
+   "axis_gt_exact": 0.8
+  },
+  "all": {
+   "n": 3400,
+   "quad_exact": 0.8176,
+   "axis_gt_exact": 0.7926
+  },
+  "base": {
+   "n": 300,
+   "quad_exact": 0.9967,
+   "axis_gt_exact": 0.97
+  },
+  "held_out_det_rec_seen": {
+   "n": 2400,
+   "quad_exact": 0.8133,
+   "axis_gt_exact": 0.7896
+  },
+  "db": {
+   "n": 300,
+   "quad_exact": 0.6233,
+   "axis_gt_exact": 0.6667
+  },
+  "fn": {
+   "n": 300,
+   "quad_exact": 0.8067,
+   "axis_gt_exact": 0.73
+  },
+  "rotate": {
+   "n": 300,
+   "quad_exact": 0.9033,
+   "axis_gt_exact": 0.8
+  },
+  "tilt": {
+   "n": 300,
+   "quad_exact": 0.81,
+   "axis_gt_exact": 0.6867
+  },
+  "weather": {
+   "n": 300,
+   "quad_exact": 0.9533,
+   "axis_gt_exact": 0.9167
+  },
+  "challenge": {
+   "n": 300,
+   "quad_exact": 0.7333,
+   "axis_gt_exact": 0.78
+  },
+  "blur": {
+   "n": 300,
+   "quad_exact": 0.68,
+   "axis_gt_exact": 0.7667
+  }
+ }
+}
