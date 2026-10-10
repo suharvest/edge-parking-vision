@@ -1,6 +1,6 @@
 {
  "set": "evaluation/data/plate_e2e/eval_set.jsonl",
- "rec": "/home/harvest/nrd-parking-run/plate-rec-axis-20261010/onnx/plate_rec_cn_96x32.onnx",
+ "rec": "models/plate_rec_cn_96x32.onnx",
  "summary": {
   "green": {
    "n": 1000,

@@ -7,7 +7,7 @@
   to 96x32 (what the runtime stage2 does with a detector box).
 
 Isolates how much of the end-to-end gap comes from the crop geometry rather
-than from detection. ONNX FP32, spark only.
+than from detection. ONNX FP32, GPU x86 workstation only.
 """
 from __future__ import annotations
 
@@ -43,7 +43,11 @@ def main() -> int:
     ap.add_argument("--det", required=True)
     ap.add_argument("--rec", required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--ccpd-root", type=Path, default=None,
+                    help="directory holding CCPD2019/ and CCPD2020/ (default: $CCPD_ROOT or data/raw/ccpd)")
     args = ap.parse_args()
+    if args.ccpd_root:
+        e2e.CCPD_ROOT = args.ccpd_root
     rows = [json.loads(l) for l in args.set.read_text(encoding="utf-8").splitlines() if l.strip()]
     be = e2e.OnnxBackend(args.det, args.rec)
     stats: dict[str, dict[str, int]] = {}

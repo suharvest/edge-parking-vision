@@ -5,14 +5,15 @@
 200 条，按四角点透视矫正到 96×32（与训练同一 warp 逻辑，无增强），另存
 crops.jsonl（{index, image, plate}），供基座 ctc_greedy 一致性测试用。
 
-用法（spark 工作区）：
+用法（GPU x86 工作站）：
     .venv/bin/python training/make_platerec_parity.py \
-        --data-root /home/harvest/edge-parking-vision \
-        --out /home/harvest/project/edge-parking-vision/evaluation/data/parity/plate_rec_cn
+        --data-root <workspace> \
+        --out evaluation/data/parity/plate_rec_cn
 """
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import sys
 from pathlib import Path
@@ -26,7 +27,7 @@ from train_platerec import VAL_MANIFESTS, image_root_for, warp_crop  # noqa: E40
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-root", type=Path, default=Path("/home/harvest/edge-parking-vision"))
+    ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("EPV_DATA_ROOT", ".")))
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--count", type=int, default=200)
     args = ap.parse_args(argv)

@@ -2,7 +2,7 @@
 #
 # 来源说明（重要）：规格 §S1 要求本文件「从 retail-vision 同一 tag 的 platforms/host-mounts/ 原样拷来」，
 # 但 retail-vision（feat/vision-base，截至 X0 执行）没有 platforms/ 目录——上游缺失，已按 §S13 汇报。
-# 以下内容按规格 §S11.1 历史记录的来源推导：fall-detection@5af128d platforms/rpi-hailo/docker-compose.yml
+# 以下内容按规格 §S11.1 历史记录的来源推导：fall-detection@5af128d Hailo 平台的 docker-compose.yml
 # fall-detection 服务的宿主挂载（基座 M2.3 并入 vision-base-hailo 的同一来源），另按 §S11.3 含 /dev/hailo0 设备。
 # 非上游拷贝，待上游提供后须原样替换并比对 sha256。
 # ABI 锁定：用户库、插件、驱动三者版本必须等于锁文件 hailort_expected（4.21.0），

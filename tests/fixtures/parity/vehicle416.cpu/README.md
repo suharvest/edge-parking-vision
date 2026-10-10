@@ -1,9 +1,9 @@
 # parity 参考帧（vehicle416，CPU 基座）
 
-**占位目录。** 真值数据需在 spark 上由 CPU 基座生成（规格 §8.1 C4 行、§S9 parity 行）：
+**占位目录。** 真值数据需在 GPU x86 工作站上由 CPU 基座生成（规格 §8.1 C4 行、§S9 parity 行）：
 
 ```bash
-# spark，基座 M2.1 完成后：
+# GPU x86 工作站，基座 M2.1 完成后：
 vb-runtime --parity tests/fixtures/parity/vehicle416.cpu/ --config <runtime.json>   # 输入 evaluation/data/parity/vehicle416/（50 帧）
 # 比对：
 uv run python ~/project/retail-vision/tools/vb_parity_compare.py \

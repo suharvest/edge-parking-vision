@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the held-out CCPD evaluation list for the end-to-end plate pipeline.
 
-Held-out rules (derived from the training code and the training data on spark):
+Held-out rules (derived from the training code and the training data on the GPU x86 workstation):
 
 * Detector (plate_det_yolox_tiny_640): trained/validated on 50 000 + 2 500
   ccpd_base images (data/coco/plate_det/{train2017,val2017}/b) and the
@@ -14,11 +14,12 @@ Held-out rules (derived from the training code and the training data on spark):
   are reported in a separate tier ("rec-seen").
 
 Output: JSON lines {id, subset, tier, path, plate, bbox:[x1,y1,x2,y2]}.
-Only stdlib; run on spark where the dataset lives.
+Only stdlib; run on the GPU x86 workstation where the dataset lives.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import random
 from pathlib import Path
@@ -44,7 +45,7 @@ def bbox_from_name(name: str) -> list[int]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-root", type=Path, default=Path("/home/harvest/edge-parking-vision"))
+    ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("EPV_DATA_ROOT", ".")))
     ap.add_argument("--per-subset-2019", type=int, default=300)
     ap.add_argument("--green-test", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=20261009)
@@ -64,7 +65,7 @@ def main() -> int:
     rng.shuffle(green)
     for rel, plate in green[: args.green_test]:
         out.append({"subset": "green", "tier": "held_out_both",
-                    "path": str(root / "data/raw/ccpd/CCPD2020/ccpd_green/test" / rel),
+                    "path": str(Path("CCPD2020/ccpd_green/test") / rel),
                     "plate": plate, "bbox": bbox_from_name(rel)})
 
     for sub in SUBSETS_2019:
@@ -76,7 +77,7 @@ def main() -> int:
         rng.shuffle(rows)
         for rel, plate in rows[: args.per_subset_2019]:
             out.append({"subset": sub, "tier": "held_out_det_rec_seen",
-                        "path": str(root / f"data/raw/ccpd/CCPD2019/CCPD2019/ccpd_{sub}" / rel),
+                        "path": str(Path(f"CCPD2019/CCPD2019/ccpd_{sub}") / rel),
                         "plate": plate, "bbox": bbox_from_name(rel)})
 
     for i, r in enumerate(out):

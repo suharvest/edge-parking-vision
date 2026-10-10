@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """平台验收工具（规格 §S9「accept_platform.py」行、§8.1 C4）。
 
-在 Mac / spark 上运行，连到被测设备：
+在 Mac / Linux 工作站上运行，连到被测设备：
   - 在 --minutes 内周期读取基座 /healthz（含停车 app 子对象，§S4）：
     每路 streams[].fps ≥ --min-fps；body 必须是可解析的 JSON 且 status == "ok"。
   - 读 MQTT 抓包 JSONL（每行 {"topic": str, "payload": object}）：

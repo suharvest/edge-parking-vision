@@ -1,8 +1,9 @@
 """plate_rec w8a8 with final 'output' Add as float16 (hybrid quantization), identical config to
-acceptance-20261008/cat-remote/round2/convert/convert_rec_w8a8_fp16out.py; ONNX and calibration list
+the earlier w8a8 conversion script; ONNX and calibration list
 are arguments. usage: python convert_rec_w8a8_fp16out.py <target> <onnx> <dataset.txt> <out_dir>"""
 import os, sys, threading
-sys.path.insert(0, "/home/harvest/sv-rknn-2320/.venv/lib/python3.10/site-packages")
+if os.environ.get("RKNN_SITE_PACKAGES"):  # optional: site-packages of an environment with rknn-toolkit2
+    sys.path.insert(0, os.environ["RKNN_SITE_PACKAGES"])
 from rknn.api import RKNN
 TARGET, ONNX, DS, OUT = sys.argv[1], os.path.abspath(sys.argv[2]), os.path.abspath(sys.argv[3]), os.path.abspath(sys.argv[4])
 STEM = os.path.basename(ONNX).removesuffix(".onnx"); FP16 = ["output"]

@@ -16,7 +16,7 @@ it is not a registry digest. Do not push, add a lock entry, or mark an image
 verified from this workflow.
 
 The 2026-10-05 local validation used the JPEG-enabled TRT-only artifact from
-the `orin-nano` SDK workspace. Its binary SHA256 was
+the Jetson Orin Nano SDK workspace. Its binary SHA256 was
 `4167fd09f08a1d12e76c3b2db492d045ef5798e8d773dd35ad8ee6bf192833c1` and the
 source snapshot archive SHA256 was
 `9a5606f4aeca813c6be634ccde03beb00d4485fadca1bc7544115c5a95987ea0`.
@@ -29,12 +29,12 @@ support.
 The SDK-side build must enable the native TensorRT backend with GStreamer:
 
 ```sh
-cmake -S core-cpp/vb -B /tmp/vb-jetson-build \
+cmake -S core-cpp/vb -B /tmp/vb-jetson-out \
   -DCMAKE_BUILD_TYPE=Release -DVB_TESTS=OFF \
   -DVB_BACKENDS=trt -DVB_WITH_GST=ON -DVB_WITH_JPEG=ON -DVB_WITH_TLS=ON \
   -DTRT_ROOT=/usr
-cmake --build /tmp/vb-jetson-build -j"$(nproc)"
-sha256sum /tmp/vb-jetson-build/vb-runtime
+cmake --build /tmp/vb-jetson-out -j"$(nproc)"
+sha256sum /tmp/vb-jetson-out/vb-runtime
 ```
 
 That command must run where `NvInfer.h`, `libnvinfer.so`, CUDA and the
@@ -46,8 +46,8 @@ redistributed by this repository. The final base image build is:
 docker build \
   --build-arg ARTIFACT_IMAGE=localhost/vb-jetson-artifact:local \
   --build-arg VB_RUNTIME_SHA256=<verified-binary-sha256> \
-  -f /home/harvest/project/retail-vision/docker/base-jetson.Dockerfile \
-  -t localhost/vb-base-jetson:local /home/harvest/project/retail-vision
+  -f <retail-vision>/docker/base-jetson.Dockerfile \
+  -t localhost/vb-base-jetson:local <retail-vision>
 docker build --build-arg BASE=localhost/vb-base-jetson:local \
   -f platforms/docker/Dockerfile -t edge-parking-jetson:local .
 ```

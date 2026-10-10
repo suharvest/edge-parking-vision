@@ -6,19 +6,19 @@
     <相对图片路径>\t<车牌文本>\t<四角点 x1,y1,x2,y2,...（8 个整数，逗号分隔）>
 
 裁切（按四角点透视矫正到 96×32）由 P6 训练脚本完成——本转换只用标准库，
-不解码图片像素，可在 spark 的裸 python3 下运行。
+不解码图片像素，可在 GPU x86 工作站的裸 python3 下运行。
 
 绿牌第 3 位实证分布 {3,5,24,33} = {D,F,0,9}（新能源 D/F 占 99.8%），
 个别标注噪声（'0'/'9' 落在 D/F 位）按 --strict 过滤：默认保留并计数，
 --strict 时只保留满足大陆单行牌正则（蓝 7 位 / 绿 8 位）的样本。
 
-用法（spark，数据目录内）：
+用法（GPU x86 工作站，数据目录内）：
 
     python3 training/ccpd_to_rec.py --src data/raw/ccpd/CCPD2020/ccpd_green \
         --out data/processed/ccpd_rec
 
 输出：<out>/ccpd2020_green_{split}.txt（split ∈ train,val,test）。
-CCPD 图片与产物只留在 spark 数据目录，不入库不分发（§7 隐私要求）。
+CCPD 图片与产物只留在 GPU x86 工作站数据目录，不入库不分发（§7 隐私要求）。
 """
 
 from __future__ import annotations

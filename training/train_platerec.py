@@ -10,7 +10,7 @@ train = ccpd2019 各子集（除 np）+ ccpd2020_green_train；val = ccpd2020_gr
 训练中每 --mem-check-interval step 检查本进程 RSS，超 --max-rss-gb 则保存
 checkpoint 后主动退出（exit code 3）。
 
-用法（spark，训练工作区 /home/harvest/edge-parking-vision）：
+用法（GPU x86 训练工作站；数据根目录由 --data-root 或 $EPV_DATA_ROOT 指定）：
 
     .venv/bin/python training/train_platerec.py --epochs 60 --batch-size 128
 冒烟：--limit 512 --epochs 1 --batch-size 32
@@ -477,7 +477,7 @@ def evaluate(model, loader, device, idx2char) -> tuple[float, float]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="PlateRecNet CN training (NRD-3 P6)")
-    ap.add_argument("--data-root", type=Path, default=Path("/home/harvest/edge-parking-vision"))
+    ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("EPV_DATA_ROOT", ".")))
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--batch-size", type=int, default=128)
     ap.add_argument("--lr", type=float, default=1e-3)

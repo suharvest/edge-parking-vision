@@ -17,17 +17,17 @@ jittered/expanded box stays inside the margin (it does for margin 0.4).
 
 The detector ONNX runs on the GPU through onnx2torch (``--device cuda``, max box
 difference vs onnxruntime CPU ≈0.03 px on 8 checked frames) or on onnxruntime CPU
-(``--device cpu``, ~30 images/s on spark). Letterbox, decode and NMS are the
+(``--device cpu``, ~30 images/s on a GPU x86 workstation). Letterbox, decode and NMS are the
 numpy functions of ``plate_e2e_eval.py`` in both cases.
 
 Images listed in ``--exclude-set`` (the held-out evaluation JSONL files) are
 dropped from every split.
 
     .venv/bin/python training/gen_platerec_axis_crops.py \
-        --data-root /home/harvest/edge-parking-vision \
+        --data-root <workspace> \
         --det models/plate_det_yolox_tiny_640.onnx \
         --exclude-set evaluation/data/plate_e2e/eval_set.jsonl \
-        --out /home/harvest/edge-parking-vision/data/processed/platerec_axisctx --workers 18
+        --out <workspace>/data/processed/platerec_axisctx --workers 18
 """
 from __future__ import annotations
 
@@ -178,7 +178,7 @@ def _run_gpu(tasks, det_path: Path, workers: int, batch: int):
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data-root", type=Path, default=Path("/home/harvest/edge-parking-vision"))
+    ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("EPV_DATA_ROOT", ".")))
     ap.add_argument("--det", type=Path, required=True)
     ap.add_argument("--exclude-set", type=Path, action="append", default=[])
     ap.add_argument("--out", type=Path, required=True)

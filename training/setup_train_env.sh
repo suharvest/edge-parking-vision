@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# 在 spark 上准备车牌检测 YOLOX 训练环境（NRD-3 P5）。幂等，可重复执行。
-# 写法沿用 edge-inspection-assembly/training/setup_spark.sh（NRD-2 §S5 同一训练链）。
+# 在 GPU x86 工作站上准备车牌检测 YOLOX 训练环境（NRD-3 P5）。幂等，可重复执行。
+# 写法沿用 edge-inspection-assembly/training/setup_train_env.sh（NRD-2 §S5 同一训练链）。
 set -euo pipefail
 
 ROOT=${ROOT:-$HOME/edge-parking-vision}

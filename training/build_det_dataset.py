@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""组装 YOLOX-Tiny 车牌检测训练集（NRD-3 §7 / P5，spark 上运行）。
+"""组装 YOLOX-Tiny 车牌检测训练集（NRD-3 §7 / P5，GPU x86 工作站上运行）。
 
 按 §7「检测：CCPD2019 base 子集（随机 5 万张）+ CCPD2020 全部；验证 5%」：
   train2017 = ccpd2019_base 随机 50000（seed 42）+ ccpd2020_green train 全部

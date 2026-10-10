@@ -2,7 +2,7 @@
 """End-to-end plate accuracy: detector + recognizer + runtime gate/vote.
 
 Re-implements the vb-runtime CPU path used by the ``plate`` preset
-(platforms/cpu/presets/plate.json) in numpy so the same code runs on spark
+(platforms/cpu/presets/plate.json) in numpy so the same code runs on the GPU x86 workstation
 (ONNX FP32) and on devices (RKNN INT8 via rknnlite, TensorRT FP16):
 
 * detector: top-left letterbox to 640x640, pad 114, half-pixel bilinear
@@ -57,13 +57,28 @@ WINDOW, MIN_AGREE, FLUSH_MIN_AGREE = 7, 3, 2
 
 
 # ---------------------------------------------------------------- image io
+CCPD_ROOT = Path(os.environ.get("CCPD_ROOT", "data/raw/ccpd"))
+
+
+def resolve_path(path: str) -> str:
+    """Eval-set rows store CCPD image paths relative to the CCPD root
+    (e.g. ``CCPD2020/ccpd_green/test/<name>.jpg``); resolve them against
+    ``--ccpd-root`` / ``$CCPD_ROOT`` (default ``data/raw/ccpd``). Absolute
+    paths and paths that already exist are used unchanged."""
+    p = Path(path)
+    if p.is_absolute() or p.exists():
+        return path
+    return str(CCPD_ROOT / p)
+
+
 def load_rgb(path: str) -> np.ndarray:
+    path = resolve_path(path)
     """RGB uint8 HxWx3. ``.rgbz`` = zlib(raw) with an 8-byte h,w header."""
     if path.endswith(".rgbz"):
         raw = Path(path).read_bytes()
         h, w = int.from_bytes(raw[:4], "little"), int.from_bytes(raw[4:8], "little")
         return np.frombuffer(zlib.decompress(raw[8:]), np.uint8).reshape(h, w, 3)
-    import cv2  # spark only
+    import cv2  # GPU x86 workstation only
     bgr = cv2.imread(path, cv2.IMREAD_COLOR)
     if bgr is None:
         raise FileNotFoundError(path)
@@ -247,7 +262,7 @@ def levenshtein(a: str, b: str) -> int:
 
 def jitter(img: np.ndarray, rng: random.Random) -> np.ndarray:
     """Small affine + gain change standing in for consecutive video frames; returns (img, M)."""
-    import cv2  # spark only
+    import cv2  # GPU x86 workstation only
     h, w = img.shape[:2]
     s = rng.uniform(0.95, 1.05)
     ang = rng.uniform(-2.0, 2.0)
@@ -506,6 +521,8 @@ def main(argv=None) -> int:
     ap.add_argument("--rec", required=True)
     ap.add_argument("--path-prefix", default=None,
                     help="rewrite each row path to <prefix>/<id>.rgbz (device runs)")
+    ap.add_argument("--ccpd-root", type=Path, default=None,
+                    help="directory holding CCPD2019/ and CCPD2020/ (default: $CCPD_ROOT or data/raw/ccpd)")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--vote-frames", type=int, default=0)
     ap.add_argument("--seed", type=int, default=20261009)
@@ -514,6 +531,9 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, required=False)
     args = ap.parse_args(argv)
 
+    global CCPD_ROOT
+    if args.ccpd_root:
+        CCPD_ROOT = args.ccpd_root
     rows = [json.loads(l) for l in args.set.read_text(encoding="utf-8").splitlines() if l.strip()]
     if args.limit:
         rows = rows[: args.limit]

@@ -12,7 +12,7 @@
 #   PATCH   — files listed in BASE_DIRTY: the base image carries uncommitted additions
 #             (plate preset, /snapshots/ route, ...), so the committed delta
 #             PATCH_FROM..SRC_COMMIT is applied on top of the file extracted from the image.
-# Build host must be linux/arm64 (spark). No network during build; base images must be local.
+# Build host must be linux/arm64 (GPU x86 workstation). No network during build; base images must be local.
 #
 # History: 20261009  = 20261008 base, PATCH_FROM f55b1ab, src e5f9dec
 #          20261009b = 20261009 base, PATCH_FROM f94d37f (core-py identical to e5f9dec)

@@ -20,7 +20,7 @@
 2. 框抖动：概率 0.8，中心偏移 U(±0.05)×框宽/高，宽、高各乘 exp(U(±0.12))。幅度参照检测框相对标注框的偏差（1000 张抽样：纵向中心偏移标准差 0.046，log 高度比标准差 0.135）。
 3. 数据：train = CCPD2019 除 np 外全部子集 + CCPD2020 green train，**去掉评测集中的 2400 张 CCPD2019 图**（每个子集 300），共 355 301 张（原 357 701）。CCPD2020 green test 不参与训练。
 
-命令（spark，训练工作区 `/home/harvest/edge-parking-vision`）：
+命令（GPU x86 工作站，工作目录为训练工作区）：
 
 ```bash
 .venv/bin/python training/gen_platerec_axis_crops.py --det models/plate_det_yolox_tiny_640.onnx \
@@ -34,7 +34,7 @@
 
 新模型训练时没见过评测集里的 2400 张 CCPD2019 图，旧模型见过；green test 对两者都是留出集。
 
-## 结果一：ONNX FP32，spark，3400 张，7 帧投票
+## 结果一：ONNX FP32，GPU x86 工作站，3400 张，7 帧投票
 
 | 子集 | 张数 | 检测召回 前→后 | 整牌准确率 前→后 | 字符准确率 前→后 | 门控读数 前→后 | 门控精度 前→后 | 发布 前→后 | 发布精度 前→后 | 正确发布 前→后 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -54,7 +54,7 @@
 - 经 flush 发布：green 32 张（旧 51）。
 - 非 GT 检测框上单帧通过门控的读数：3400 张共 22 条（旧 9 条）；非 GT 检测框数量不变（0.008 个/张）。
 
-原始数据：`onnx_fp32_spark_full.json`。
+原始数据：`onnx_fp32_x86_full.json`。
 
 ## 结果二：裁切方式对识别的影响（只跑识别，GT 框）
 
@@ -69,9 +69,9 @@
 
 | 后端 | 设备 | 检测召回 | 整牌准确率 前→后 | 字符准确率 | 门控读数 | 门控精度 | 与 ONNX 读出一致 | 运行时间 |
 |---|---|---|---|---|---|---|---|---|
-| ONNX FP32 | spark | 98.4% | 52.8% → 77.2% | 92.9% | 84.9% | 88.1% | — | 75.3 s |
-| RKNN INT8 | RK3588（radxa） | 98.8% | 51.2% → 78.8% | 93.4% | 84.9% | 88.8% | 421/504 | 38.5 s |
-| RKNN INT8 | RK3576（cat-remote） | 98.8% | 51.2% → 79.0% | 93.4% | 84.7% | 89.0% | 421/504 | 53.4 s |
+| ONNX FP32 | GPU x86 工作站| 98.4% | 52.8% → 77.2% | 92.9% | 84.9% | 88.1% | — | 75.3 s |
+| RKNN INT8 | RK3588 | 98.8% | 51.2% → 78.8% | 93.4% | 84.9% | 88.8% | 421/504 | 38.5 s |
+| RKNN INT8 | RK3576 | 98.8% | 51.2% → 79.0% | 93.4% | 84.7% | 89.0% | 421/504 | 53.4 s |
 | TensorRT FP16 | Jetson Orin Nano | 98.4% | 53.2% → 77.4% | 92.8% | 85.1% | 88.6% | 491/504 | 30.7 s |
 
 green test 200 张整牌准确率：ONNX 74.5%、RK3588 77.0%、RK3576 77.5%、Orin Nano 74.5%；门控精度 91.4–91.9%。
@@ -80,28 +80,28 @@ green test 200 张整牌准确率：ONNX 74.5%、RK3588 77.0%、RK3576 77.5%、O
 
 | 文件 | sha256 | 转换 |
 |---|---|---|
-| `plate_rec_cn_96x32.rk3588.int8.rknn` | `8d4e8e34…9d99` | rknn-toolkit2 2.3.2（spark），w8a8 + 末层 Add 输出 float16（hybrid quantization），mean 0 std 255，opt 3 |
+| `plate_rec_cn_96x32.rk3588.int8.rknn` | `8d4e8e34…9d99` | rknn-toolkit2 2.3.2（GPU x86 工作站），w8a8 + 末层 Add 输出 float16（hybrid quantization），mean 0 std 255，opt 3 |
 | `plate_rec_cn_96x32.rk3576.int8.rknn` | `ff124d18…6f48` | 同上，target rk3576；脚本 `training/convert_platerec_rknn_fp16out.py <target> <onnx> <dataset.txt> <out>` |
-| `plate_rec_cn_96x32_fp16.engine` | `d971442e…ba34` | orin-nano 上 `trtexec --fp16 --memPoolSize=workspace:512 --builderOptimizationLevel=3`（TensorRT 10.3） |
+| `plate_rec_cn_96x32_fp16.engine` | `d971442e…ba34` | Jetson Orin Nano 上 `trtexec --fp16 --memPoolSize=workspace:512 --builderOptimizationLevel=3`（TensorRT 10.3） |
 
 RKNN 校准集：CCPD2020 green val 等间隔取 200 张，按运行时裁切（检测框 + 0.08 扩边）生成，`training/make_platerec_axis_calib.py`；与 10-08 的做法相同（200 张 green val 车牌裁切图，RGB 存储），只是裁切方式换成运行时裁切。
 
-原始数据：`onnx_fp32_spark_device_subset.json`、`rknn_int8_rk3588_radxa.json`、`rknn_int8_rk3576_cat-remote.json`、`trt_fp16_orin-nano.json`（RK3576 与 Orin Nano 分 4 批运行后合并）。
+原始数据：`onnx_fp32_x86_device_subset.json`、`rknn_int8_rk3588.json`、`rknn_int8_rk3576.json`、`trt_fp16_orin_nano.json`（RK3576 与 Orin Nano 分 4 批运行后合并）。
 
 ## 发布
 
 `nrd-artifacts/20261010/`：`plate_jetson_orin_nano-b3680529cc01`、`plate_rk3588-a1ca2b551103`、`plate_rk3576-33644b5e41a5`（`.tar.gz`），检测文件与 20261008 包相同，识别文件换为上表三个。Hailo-8 包未重做。
 
-## 结果四：Hailo-8（harvest-pi，HailoRT 4.21.0，504 张设备子集，单帧）
+## 结果四：Hailo-8（Raspberry Pi 5，HailoRT 4.21.0，504 张设备子集，单帧）
 
-识别 HEF 用 10-08 相同配方重编：wsl2-local 上 `hailo_ai_sw_suite_2025-04:1`（DFC 3.31.0），`--hw-arch hailo8`，`rec.alls` 不变（`normalization1` 折叠 /255、`optimization_level=1, compression_level=0`、校准 batch 8 / 200 张）；校准集为上面 RKNN 用的 200 张运行时裁切图（`calib_rec.npy` sha256 `e6656366…4fd79`）。输出层 SNR 31.21 dB（旧 31.34 dB）。新 HEF sha256 `ad01cdca…cb90`。检测 HEF 沿用 10-08 的 `19a1256a…ca13`。
+识别 HEF 用 10-08 相同配方重编：GPU x86 主机上 `hailo_ai_sw_suite_2025-04:1`（DFC 3.31.0），`--hw-arch hailo8`，`rec.alls` 不变（`normalization1` 折叠 /255、`optimization_level=1, compression_level=0`、校准 batch 8 / 200 张）；校准集为上面 RKNN 用的 200 张运行时裁切图（`calib_rec.npy` sha256 `e6656366…4fd79`）。输出层 SNR 31.21 dB（旧 31.34 dB）。新 HEF sha256 `ad01cdca…cb90`。检测 HEF 沿用 10-08 的 `19a1256a…ca13`。
 
 | 运行 | 检测召回 | 整牌准确率 | 字符准确率 | 门控读数 | 门控精度 | 与新 ONNX 读出一致 | green 200 整牌 | 运行时间 |
 |---|---|---|---|---|---|---|---|---|
-| ONNX FP32 新识别模型（spark） | 98.4% | 77.2% | 92.9% | 84.9% | 88.1% | 504/504 | 74.5% | 75.3 s |
+| ONNX FP32 新识别模型（GPU x86 工作站） | 98.4% | 77.2% | 92.9% | 84.9% | 88.1% | 504/504 | 74.5% | 75.3 s |
 | Hailo-8 新 HEF | 98.6% | 78.4% | 92.8% | 85.3% | 88.6% | 422/504 | 74.5% | 31.5 s |
 | Hailo-8 旧 HEF（`340db0a6…`） | 98.6% | 51.4% | 80.2% | 53.0% | 83.9% | 274/504 | 50.0% | 31.1 s |
 
-`--backend hailo`：两个 HEF 在同一 VDevice 上用 round-robin 调度；检测输入是与其他后端相同的左上对齐 letterbox 画布（RGB uint8），不是运行时 hailo_source 的拉伸画面；检测 9 个输出按步长拼回 ONNX 的 [1, 8400, 6] 行布局。HailoRT 在解释器退出时段错误（结果 JSON 已写完，见 device-gotchas rpi-hailo）。原始数据：`hailo8_new_harvest-pi.json`、`hailo8_old_rec_harvest-pi.json`。
+`--backend hailo`：两个 HEF 在同一 VDevice 上用 round-robin 调度；检测输入是与其他后端相同的左上对齐 letterbox 画布（RGB uint8），不是运行时 hailo_source 的拉伸画面；检测 9 个输出按步长拼回 ONNX 的 [1, 8400, 6] 行布局。HailoRT 在解释器退出时段错误（结果 JSON 已写完，见 device-gotchas rpi-hailo）。原始数据：`hailo8_new_rpi5.json`、`hailo8_old_rec_rpi5.json`。
 
 发布：`nrd-artifacts/20261010/plate_hailo8-b53c31c16b4b.tar.gz`（检测 HEF 不变，识别 HEF 换新）。

@@ -10,7 +10,7 @@
     若表序相反（数字在前），数字会落在 0-9 而不是 24-33
   - 解码文本对 §6.4 蓝牌正则的匹配率
 
-用法（spark 裸 python3，只用标准库）：
+用法（GPU x86 工作站裸 python3，只用标准库）：
 
     python3 training/ccpd2019_validate.py --src data/raw/ccpd/CCPD2019/ccpd_base [--limit 5000]
 """

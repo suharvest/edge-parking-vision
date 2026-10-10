@@ -26,7 +26,7 @@ def test_cpu_plate_preset_uses_production_paths_and_cpu_preprocess():
 
 def test_cpu_plate_file_fixture_is_explicitly_local():
     cfg = json.loads((ROOT / "tests/fixtures/config.plate.file.json").read_text())
-    assert cfg["streams"][0]["url"] == "file:///home/harvest/project/edge-parking-vision/tests/fixtures/plate_q0_60s.mp4"
+    assert cfg["streams"][0]["url"] == "file://__REPO__/tests/fixtures/plate_q0_60s.mp4"
     assert cfg["native"]["binary"] == "/tmp/retail-vb-root-stage2/vb-runtime"
     assert cfg["backend"]["decoder"] == {"type": "yolox", "num_classes": 1,
                                            "strides": [8, 16, 32],

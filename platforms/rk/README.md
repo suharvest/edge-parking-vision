@@ -16,12 +16,12 @@ BGR. The 64 images are calibration input, not an accuracy holdout.
 Example (use an existing local Toolkit2 environment; do not install packages):
 
 ```bash
-uv run --no-project --no-sync --python /home/harvest/sv-rknn-2320/.venv/bin/python \
+uv run --no-project --no-sync --python <toolkit2-venv>/bin/python \
   platforms/rk/convert_rknn.py \
   --onnx models/yolox_tiny_coco_416.onnx \
   --calib-list evaluation/data/calib/vehicle_416.txt \
   --size 416 --target rk3576 \
-  --out-dir /home/harvest/nrd-parking-run/artifacts-rknn-20261005/vehicle416-rk3576
+  --out-dir <output-dir>/vehicle416-rk3576
 ```
 
 The converter validates the selected vehicle variant against MODEL-CARD.json,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 基座镜像锁核对（规格 §S11.2）。联网工具，Mac 或 spark 上运行。
+# 基座镜像锁核对（规格 §S11.2）。联网工具，Mac 或 Linux 工作站上运行。
 #
 #   bash tools/check_base_images.sh          # 对锁文件每个 bases.* 跑 imagetools inspect，digest 与注册表不一致退出 1
 #   bash tools/check_base_images.sh --sync   # 从 retail_vision_tag 拉取 retail-vision 锁文件、host-mounts/、

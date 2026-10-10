@@ -7,12 +7,13 @@ training/train_platerec.py（不另写一套解码）。
 
 用法：
     .venv/bin/python training/eval_platerec.py \
-        --ckpt /home/harvest/edge-parking-vision/training/outputs/platerec_cn_full/best.pth \
-        --data-root /home/harvest/edge-parking-vision
+        --ckpt <workspace>/training/outputs/platerec_cn_full/best.pth \
+        --data-root <workspace>
 """
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -30,7 +31,7 @@ from train_platerec import (RecDataset, build_items, collate, decode_texts,  # n
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", type=Path, required=True)
-    ap.add_argument("--data-root", type=Path, default=Path("/home/harvest/edge-parking-vision"))
+    ap.add_argument("--data-root", type=Path, default=Path(os.environ.get("EPV_DATA_ROOT", ".")))
     ap.add_argument("--manifest", default="ccpd2020_green_test.txt")
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--num-workers", type=int, default=4)
