@@ -1,17 +1,34 @@
 # LICENSES.md
 
-许可按 BASE-1 §7.1 的三层分列：**代码许可 / 权重许可 / 训练与标注数据许可**分别核实、分别记录，「可商用」不能从仓库代码许可单独推出。本文件为 NRD-2 §S7 初稿的实现，随交付逐项更新。
+许可按三层分列：**代码许可 / 权重许可 / 训练与标注数据许可**分别核实、分别记录；代码许可不能代替权重与数据许可。
 
 ## 三层分列（模型，对应 `MODEL-CARD.json` 的 `licenses_three_layer`）
 
 | 层 | 组件 | 许可 | 原文 | 商用 | 署名 |
 |---|---|---|---|---|---|
 | 代码 | YOLOX 代码（导出用，0.3.0） | Apache-2.0 | https://github.com/Megvii-BaseDetection/YOLOX/blob/main/LICENSE | 是 | 保留 NOTICE |
-| 权重 | `yolox_tiny.pth`（release 0.1.1rc0，sha256 `9de513de…aee8f0`，不入库） | 随 release 附 Apache-2.0 LICENSE 发布；授权声明独立于代码许可（BASE-1 §7.1） | 同上 | 按用户 2026-09-26 决策继续用于测试与基准；不分发 .pth；不据此写「权重可商用」 | NOTICE 记录 release tag 与 sha256 |
-| 训练数据 | COCO 2017 | 标注 CC BY 4.0；图片版权归各 Flickr 作者 | https://cocodataset.org/#termsofuse（原文见 URD-2 §7.3） | 不写「COCO 可商用」；不分发 COCO 图片 | 署名 COCO Consortium |
-| 训练数据 | CCPD（CCPD2019 蓝牌 + CCPD2020 绿牌，车牌检测/识别训练） | MIT | https://github.com/detectRecog/CCPD/blob/master/LICENSE（"MIT License, Copyright (c) 2017 CCPD"；README："This dataset is open-source under MIT license."，2026-09-25 核实，见 NRD-3 §7） | 是 | 图片含真实车牌，只用于训练，不进 gallery、不随交付分发；parity/校准帧不取 CCPD（用 dev 集） |
+| 权重 | `yolox_tiny.pth`（release 0.1.1rc0，sha256 `9de513de…aee8f0`，不入库） | 随 release 附 Apache-2.0 LICENSE 发布；授权声明独立于代码许可 | 同上 | 按用户 2026-09-26 决策继续用于测试与基准；不分发 .pth；不据此写「权重可商用」 | NOTICE 记录 release tag 与 sha256 |
+| 训练数据 | COCO 2017 | 标注 CC BY 4.0；图片版权归各 Flickr 作者 | https://cocodataset.org/#termsofuse | 不写「COCO 可商用」；不分发 COCO 图片 | 署名 COCO Consortium |
+| 训练与评测数据 | CCPD（Xu, Z. et al., ECCV 2018；CCPD2019 蓝牌 + CCPD2020 绿牌，车牌检测/识别训练与评测） | MIT，"Copyright (c) 2017 CCPD" | https://github.com/detectRecog/CCPD/blob/master/LICENSE | 是 | 见下文「CCPD 衍生内容」 |
 
-用户 2026-09-26 决策：COCO 权重在 A 类（测试与基准用）继续使用；后续自训权重按 Apache-2.0 发布（NRD-3 车牌模型），自训不自动消除初始化权重与训练数据的许可，替换后仍逐文件列清单。
+用户 2026-09-26 决策：COCO 权重在 A 类（测试与基准用）继续使用；后续自训权重按 Apache-2.0 发布（车牌模型），自训不自动消除初始化权重与训练数据的许可，替换后仍逐文件列清单。
+
+## CCPD 衍生内容（本仓库包含的部分）
+
+来源：CCPD（Xu, Z. et al., "Towards End-to-End License Plate Detection and Recognition: A Large Dataset and Baseline", ECCV 2018），https://github.com/detectRecog/CCPD ，MIT License，Copyright (c) 2017 CCPD。
+
+本仓库包含以下由 CCPD 派生的内容，用于模型 parity 对照与精度评测：
+
+| 路径 | 内容 | 数量 |
+|---|---|---|
+| `evaluation/data/parity/plate_rec_cn/crops/` | 从 CCPD2020 绿牌 val 按标注四角点透视矫正到 96×32 的车牌裁切图（无增强） | 200 张 PNG |
+| `evaluation/data/parity/plate_rec_cn/crops.jsonl` | 上述裁切图的车牌号标签 | 200 行 |
+| `evaluation/data/plate_e2e/eval_set.jsonl`、`device_subset.jsonl` | 端到端评测清单：CCPD 原图文件名（相对 CCPD 根目录的路径）、车牌号标签、检测框 | 3400 / 504 行 |
+
+说明：
+- 裁切图含真实车牌，内容与 CCPD 公开发布的数据集一致，车牌号为公开数据集中的标注。
+- CCPD 完整原图不在本仓库中；评测清单只引用路径，运行评测需自行从 CCPD 官方仓库获取并通过 `--ccpd-root`（或环境变量 `CCPD_ROOT`）指定。
+- 再分发时保留 CCPD 的 MIT 许可声明（见 `NOTICE`）。
 
 ## 本仓库与第三方组件
 
