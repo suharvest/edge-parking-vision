@@ -35,8 +35,8 @@
 | 组件 | 版本 / 地址 | 许可 | 原文 | 商用 | 署名 |
 |---|---|---|---|---|---|
 | edge-parking-vision 自身代码 | 本仓库 | Apache-2.0 | 仓库 `LICENSE` | 是 | NOTICE |
-| retail-vision（`vision_base` Python 包 + `vb-runtime` + 基座镜像 `vision-base-<p>`） | tag `vision-base-v<semver>`；镜像 digest 见 `platforms/base-images.lock.yaml` | Apache-2.0（仓库 `LICENSE` 首行） | 仓库 LICENSE | 是 | NOTICE 写明 tag 与各镜像 digest；镜像内第三方组件见 retail-vision `NOTICE` |
-| retail-vision 拷入文件（`vb_analyzer_abi.h`、`host-mounts/*.yaml`） | 同一 tag | Apache-2.0 | 仓库 LICENSE | 是 | NOTICE |
+| retail-vision（`vision_base` Python 包已内置于 `third_party/vision_base/`，commit `2af1ee5b`；`vb-runtime` 与基座镜像 `vision-base-<p>` 不在本仓库） | tag `vision-base-v<semver>`；镜像 digest 见 `platforms/base-images.lock.yaml` | Apache-2.0（仓库 `LICENSE` 首行） | 仓库 LICENSE | 是 | NOTICE 写明 tag 与各镜像 digest；镜像内第三方组件见 retail-vision `NOTICE` |
+| retail-vision 拷入文件（`vb_analyzer_abi.h`、`third_party/vision_base/`） | 见 NOTICE | Apache-2.0 | 仓库 LICENSE | 是 | NOTICE |
 | fall-detection（早期内部仓库，无公开来源） | — | — | — | 仅作 `platforms/jetson/build_engine.sh` 参数约定与 `platforms/host-mounts/*.yaml` 挂载项的设计参考；本仓库文件为自行编写，未拷入其文件 | — |
 | edge-inspection-assembly（转换脚本写法、MODEL-CARD/SHA256SUMS 格式的参考） | — | — | — | 仅参考文件格式，未拷贝文件内容 | — |
 | edge-security-kit | — | — | — | 仅借设计，未拷贝代码 | — |

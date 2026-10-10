@@ -12,6 +12,11 @@ Copyright 2026 Seeed Studio
   来源：Seeed-Solution/retail-vision，core-cpp/vb/include/vb/vb_analyzer_abi.h，
   Apache License 2.0。与上游同名文件逐字节一致（cmp 校验）。
 
+- third_party/vision_base/（Python 包 vision_base，仅标准库）
+  来源：Seeed-Solution/retail-vision，core-py/vision_base/，commit
+  2af1ee5b54b3c5cdfef61eb74d8bccbf51c89bc3，Apache License 2.0。
+  上游 LICENSE 原文在 third_party/vision_base/LICENSE；不含上游 tests/。
+
 本仓库自行编写、非拷贝的文件：
 - platforms/host-mounts/{jetson,rk3576,rk3588,hailo}.yaml：依据各板卡 compose 挂载项整理，
   文件头注释记录了推导来源。

@@ -1,7 +1,6 @@
 # rk3588 宿主挂载（规格 §S11.2 bases.rk.host_mounts.rk3588；§S11.3 compose 以此 ∪ 通用三项生成 volumes/devices/tmpfs）。
 #
-# 来源说明（重要）：规格 §S1 要求本文件「从 retail-vision 同一 tag 的 platforms/host-mounts/ 原样拷来」，
-# 但 retail-vision（feat/vision-base，截至 X0 执行）没有 platforms/ 目录——上游缺失，已按 §S13 汇报。
+# 来源说明：上游 retail-vision 尚无 platforms/host-mounts/，本文件为本仓库整理，非上游拷贝。
 # 以下内容按规格 §S11.1 的来源定义推导：fall-detection@5af128d platforms/rk3588/docker-compose.yml 的 compose 挂载，
 # 去掉规格 §S11.1 D10 行列出的三个宿主 site-packages 挂载项（tests/test_base_images.py 断言这三项不出现）。
 # 非上游拷贝，待上游提供后须原样替换并比对 sha256。

@@ -11,7 +11,7 @@ support fails closed instead of disabling `_ssl`, `hashlib`, `socket`, or
 compression modules.
 
 `build-deb.sh` requires real RISC-V `vb-runtime` and Python staging. It copies
-`vision_base` and `core_parking`, creates the K92 SysV script and control files,
+the vendored `third_party/vision_base` and `core_parking`, creates the K92 SysV script and control files,
 and runs `dpkg-deb --build --root-owner-group`. Models stay outside the deb and
 belong directly under `/userdata/local/models/` through the upstream preset.
 
@@ -19,12 +19,11 @@ Example:
 
 ```sh
 ./build-python-runtime.sh \
-  --sysroot /home/harve/waste-cvi/host-tools/gcc/riscv64-linux-musl-x86_64/sysroot \
-  --cross-prefix /home/harve/waste-cvi/host-tools/gcc/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl- \
+  --sysroot <toolchain>/riscv64-linux-musl-x86_64/sysroot \
+  --cross-prefix <toolchain>/riscv64-linux-musl-x86_64/bin/riscv64-unknown-linux-musl- \
   --out /path/to/owned/python-runtime
 ./build-deb.sh --version 0.1.0 \
-  --retail-vision /path/to/retail-vision \
-  --recamera /home/harve/waste-cvi/sg2002_recamera_emmc \
+  --recamera <sg2002-recamera-sdk> \
   --python-staging /path/to/owned/python-runtime/stage \
   --vb-runtime /path/to/vb-runtime
 ```
