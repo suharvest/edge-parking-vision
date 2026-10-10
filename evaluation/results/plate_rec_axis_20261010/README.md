@@ -102,6 +102,6 @@ RKNN 校准集：CCPD2020 green val 等间隔取 200 张，按运行时裁切（
 | Hailo-8 新 HEF | 98.6% | 78.4% | 92.8% | 85.3% | 88.6% | 422/504 | 74.5% | 31.5 s |
 | Hailo-8 旧 HEF（`340db0a6…`） | 98.6% | 51.4% | 80.2% | 53.0% | 83.9% | 274/504 | 50.0% | 31.1 s |
 
-`--backend hailo`：两个 HEF 在同一 VDevice 上用 round-robin 调度；检测输入是与其他后端相同的左上对齐 letterbox 画布（RGB uint8），不是运行时 hailo_source 的拉伸画面；检测 9 个输出按步长拼回 ONNX 的 [1, 8400, 6] 行布局。HailoRT 在解释器退出时段错误（结果 JSON 已写完，见 device-gotchas rpi-hailo）。原始数据：`hailo8_new_rpi5.json`、`hailo8_old_rec_rpi5.json`。
+`--backend hailo`：两个 HEF 在同一 VDevice 上用 round-robin 调度；检测输入是与其他后端相同的左上对齐 letterbox 画布（RGB uint8），不是运行时 hailo_source 的拉伸画面；检测 9 个输出按步长拼回 ONNX 的 [1, 8400, 6] 行布局。HailoRT 在解释器退出时段错误（结果 JSON 已写完）。原始数据：`hailo8_new_rpi5.json`、`hailo8_old_rec_rpi5.json`。
 
 发布：`nrd-artifacts/20261010/plate_hailo8-b53c31c16b4b.tar.gz`（检测 HEF 不变，识别 HEF 换新）。

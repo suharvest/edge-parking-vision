@@ -19,7 +19,7 @@
    "flush_min_agree": 2,
    "roi": null
   },
-  "device": "jetson-orin-nano"
+  "device": "jetson_orin_nano"
  },
  "summary": {
   "green": {
