@@ -13,7 +13,7 @@ systemd mosquitto，telegraf 以 `viewer` 角色连接（ACL 只读 `+/parking/#
 在 R1124（或能连到 broker 的机器）上：
 
 ```bash
-MQTT_HOST=r1124.local MQTT_USERNAME=viewer MQTT_PASSWORD=<viewer口令> \
+MQTT_HOST=broker.local MQTT_USERNAME=viewer MQTT_PASSWORD=<viewer口令> \
 docker compose -f backend/docker-compose.yml up -d
 ```
 

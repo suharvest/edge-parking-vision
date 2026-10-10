@@ -37,9 +37,7 @@
 | edge-parking-vision 自身代码 | 本仓库 | Apache-2.0 | 仓库 `LICENSE` | 是 | NOTICE |
 | retail-vision（`vision_base` Python 包已内置于 `third_party/vision_base/`，commit `2af1ee5b`；`vb-runtime` 与基座镜像 `vision-base-<p>` 不在本仓库） | tag `vision-base-v<semver>`；镜像 digest 见 `platforms/base-images.lock.yaml` | Apache-2.0（仓库 `LICENSE` 首行） | 仓库 LICENSE | 是 | NOTICE 写明 tag 与各镜像 digest；镜像内第三方组件见 retail-vision `NOTICE` |
 | retail-vision 拷入文件（`vb_analyzer_abi.h`、`third_party/vision_base/`） | 见 NOTICE | Apache-2.0 | 仓库 LICENSE | 是 | NOTICE |
-| fall-detection（早期内部仓库，无公开来源） | — | — | — | 仅作 `platforms/jetson/build_engine.sh` 参数约定与 `platforms/host-mounts/*.yaml` 挂载项的设计参考；本仓库文件为自行编写，未拷入其文件 | — |
-| edge-inspection-assembly（转换脚本写法、MODEL-CARD/SHA256SUMS 格式的参考） | — | — | — | 仅参考文件格式，未拷贝文件内容 | — |
-| edge-security-kit | — | — | — | 仅借设计，未拷贝代码 | — |
+| 内部原型脚本（无公开来源） | — | — | — | 仅作 `platforms/jetson/build_engine.sh` 参数约定、`platforms/host-mounts/*.yaml` 挂载项与训练环境脚本写法的设计参考；本仓库文件为自行编写，未拷入其文件 | — |
 | rknn-toolkit2（仅转换机）/ librknnrt（宿主挂载） | 2.3.2；RK 板按宿主版本 | RKNN SDK License（Rockchip；https://github.com/airockchip/rknn-toolkit2/blob/master/LICENSE，2026-10-10 核对仓库 LICENSE 首行） | 同左 | 不随本仓库分发；用户自行从 Rockchip 获取 | — |
 | TensorRT / CUDA（宿主挂载） | JetPack 6 | NVIDIA 许可（随 JetPack 安装） | 随 JetPack | 不随本仓库、不随镜像分发 | — |
 | HailoRT（`libhailort` 宿主挂载）/ Dataflow Compiler（仅转换机） | 4.21.0 | HailoRT：libhailort、pyhailort、hailortcli 为 MIT，hailonet GStreamer 插件为 LGPL-2.1-or-later（https://github.com/hailo-ai/hailort README，2026-10-10 核对）；Dataflow Compiler 为 Hailo Developer Zone 许可 | 同左 | 不随本仓库分发；HEF 为本项目产物 | — |

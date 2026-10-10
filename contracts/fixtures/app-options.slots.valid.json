@@ -1,7 +1,7 @@
 {
   "site_id": "demo-lot",
   "mqtt": {
-    "host": "r1124.local",
+    "host": "broker.local",
     "port": 1883,
     "username": "demo-lot-gate-a",
     "password": "",

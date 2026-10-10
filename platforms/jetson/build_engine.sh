@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Build YOLOX vehicle engines on the target Jetson.  The ONNX file remains a
 # host input and the engine is intentionally never copied into this repo.
-# Usage is compatible with the fall-detection helper while selecting the
+# Usage follows an earlier internal helper while selecting the
 # static shape from the registered vehicle model.
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 MODEL.onnx OUTPUT.engine [trtexec args...]" >&2

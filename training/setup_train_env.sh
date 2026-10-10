@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 在 GPU x86 工作站上准备车牌检测 YOLOX 训练环境（NRD-3 P5）。幂等，可重复执行。
-# 写法沿用 edge-inspection-assembly/training/setup_train_env.sh（NRD-2 §S5 同一训练链）。
+# YOLOX 训练环境准备脚本。
 set -euo pipefail
 
 ROOT=${ROOT:-$HOME/edge-parking-vision}

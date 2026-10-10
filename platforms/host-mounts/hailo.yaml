@@ -1,9 +1,7 @@
 # hailo 宿主挂载（规格 §S11.2 bases.hailo.host_mounts；§S11.3 compose 以此 ∪ 通用三项生成 volumes/devices/tmpfs）。
 #
 # 来源说明：上游 retail-vision 尚无 platforms/host-mounts/，本文件为本仓库整理，非上游拷贝。
-# 以下内容按规格 §S11.1 历史记录的来源推导：fall-detection@5af128d Hailo 平台的 docker-compose.yml
-# fall-detection 服务的宿主挂载（基座 M2.3 并入 vision-base-hailo 的同一来源），另按 §S11.3 含 /dev/hailo0 设备。
-# 非上游拷贝，待上游提供后须原样替换并比对 sha256。
+# 内容按各板卡 compose 的宿主挂载项整理（内部原型，无公开来源）。
 # ABI 锁定：用户库、插件、驱动三者版本必须等于锁文件 hailort_expected（4.21.0），
 # 部署前用 platforms/hailo/check_hailort.sh 预检（X4）；镜像内不含 HailoRT（BASE-1 §8 第 3 条）。
 devices:

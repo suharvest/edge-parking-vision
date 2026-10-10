@@ -23,7 +23,7 @@
               "max_misses": 15, "max_lost_s": 1.5, "min_hits": 1,
               "class_aware": true, "anchor": "bottom_center"},
   "analyzers": {"plugins": []},
-  "mqtt": {"host": "r1124.local", "port": 1883, "client_id": "demo-lot-gate-a",
+  "mqtt": {"host": "broker.local", "port": 1883, "client_id": "demo-lot-gate-a",
            "username": "demo-lot-gate-a", "password": "", "tls": false,
            "ca_file": "", "keepalive_s": 30, "topic_root": "demo-lot/parking/gate-a",
            "status_interval_s": 10},
@@ -34,7 +34,7 @@
   "app": {"name": "edge-parking-plate", "module": "core_parking.config:ParkingApp",
     "options": {
       "site_id": "demo-lot",
-      "mqtt": {"host": "r1124.local", "port": 1883, "username": "demo-lot-gate-a",
+      "mqtt": {"host": "broker.local", "port": 1883, "username": "demo-lot-gate-a",
                "password": "", "keepalive_s": 30},
       "http": {"port": 8080}, "spool": {"max_events": 50000},
       "preview_frame_stride": 15,

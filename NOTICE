@@ -20,7 +20,7 @@ Copyright 2026 Seeed Studio
 本仓库自行编写、非拷贝的文件：
 - platforms/host-mounts/{jetson,rk3576,rk3588,hailo}.yaml：依据各板卡 compose 挂载项整理，
   文件头注释记录了推导来源。
-- platforms/jetson/build_engine.sh：本仓库编写，参数约定与早期 fall-detection 的同名辅助脚本相近。
+- platforms/jetson/build_engine.sh：本仓库编写，参数约定与更早的内部同名辅助脚本相近（内部脚本，无公开来源）。
 
 二、数据集
 ----------
@@ -62,4 +62,3 @@ Copyright 2026 Seeed Studio
 基座镜像 ref 与 digest 记录在 platforms/base-images.lock.yaml，镜像内第三方组件见
 Seeed-Solution/retail-vision 的 NOTICE。
 
-edge-security-kit（无 LICENSE）不拷入任何文件。
